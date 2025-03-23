@@ -1,0 +1,50 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <!-- 背景分形网格 -->
+    <path d="M64 120
+             C20 110, 8 80, 18 50
+             C28 20, 60 8, 90 18
+             C120 28, 132 60, 122 90
+             C112 120, 80 132, 50 122
+             Z" 
+          fill="#1A1B3E" 
+          stroke="#2C3A58" 
+          stroke-width="1.2"/>
+    <!-- 因果神经网 -->
+    <g stroke="#4FD1C5" stroke-width="1.5" fill="none">
+        <path d="M40 88 Q64 70 88 88" opacity="0.8"/>
+        <path d="M88 40 Q64 60 40 40" opacity="0.8"/>
+        <circle cx="64" cy="64" r="24" stroke-dasharray="3 3"/>
+    </g>
+    <!-- AI核心晶体 -->
+    <g transform="translate(64 64)">
+        <path d="M-16 0 L0 -16 L16 0 L0 16 Z
+                 M-8 -8 L8 -8 L8 8 L-8 8 Z" 
+              fill="url(#grad)" 
+              stroke="#FF6B6B" 
+              stroke-width="1.2"/>
+        <path d="M-12 0 L0 12 L12 0 L0 -12 Z" 
+              fill="#FFD93D" 
+              opacity="0.7"/>
+    </g>
+    <!-- 数据流粒子 -->
+    <g opacity="0.9">
+        <circle cx="100" cy="30" r="3" fill="#4FD1C5"/>
+        <circle cx="28" cy="100" r="2" fill="#FF6B6B"/>
+        <circle cx="95" cy="95" r="2.5" fill="#FFD93D"/>
+    </g>
+    <!-- 微光效果 -->
+    <filter id="glow">
+        <feGaussianBlur stdDeviation="2.5" result="glow"/>
+        <feMerge>
+            <feMergeNode in="glow"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+    </filter>
+    <defs>
+        <!-- 核心渐变 -->
+        <radialGradient id="grad">
+            <stop offset="0%" stop-color="#845EC2"/>
+            <stop offset="100%" stop-color="#2C3A58"/>
+        </radialGradient>
+    </defs>
+</svg>
