@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <style>
+        .arrow {
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .cause { stroke: #4a90e2; }
+        .effect { stroke: #f5a623; }
+    </style>
+    <!-- 因果循环路径 -->
+    <path class="arrow cause" 
+          d="M6 24 
+             C2 18, 8 10, 15 9
+             C22 8, 28 16, 24 24"
+          stroke-width="2"/>
+    <path class="arrow effect" 
+          d="M24 6 
+             C28 12, 22 20, 15 21
+             C8 22, 2 14, 6 6"
+          stroke-width="2"/>
+    <!-- 箭头头部 -->
+    <path class="cause" 
+          d="M5.5 23.5 l4-3.5 -4-3.5"
+          stroke-width="1.5"/>
+    <path class="effect" 
+          d="M24.5 6.5 l-4 3.5 4 3.5"
+          stroke-width="1.5"/>
+</svg>
