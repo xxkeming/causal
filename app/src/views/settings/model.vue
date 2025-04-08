@@ -256,7 +256,7 @@ import {
   HelpCircleOutline // 添加帮助图标
 } from '@vicons/ionicons5';
 import { useProviderStore, ProviderApiCategory } from '../../stores/providerStore';
-import { ProviderModel } from '../../services/typings';
+import { Model } from '../../services/typings';
 
 // 组件状态
 const currentProviderId = ref<number | null>(null);
@@ -278,7 +278,7 @@ const defaultFormModel = {
   apiCategory: '',
   url: '',
   apiKey: '',
-  models: [] as ProviderModel[] // 明确标注类型为ProviderModel[]
+  models: [] as Model[] // 明确标注类型为ProviderModel[]
 };
 
 // 创建响应式表单模型
@@ -287,7 +287,7 @@ const formModel = reactive<{
   apiCategory: string;
   url: string;
   apiKey: string;
-  models: ProviderModel[]; // 明确标注类型
+  models: Model[]; // 明确标注类型
 }>({...defaultFormModel});
 
 // 表单验证规则
@@ -520,12 +520,11 @@ async function saveProvider() {
     
     if (isCreating.value) {
       // 创建新提供商
-      const newProvider = await providerStore.createProvider(providerData);
+      await providerStore.createProvider(providerData);
       message.success('创建提供商成功');
       
       // 选择新创建的提供商
       isCreating.value = false;
-      currentProviderId.value = newProvider.id;
     } else if (currentProviderId.value) {
       // 更新现有提供商
       await providerStore.modifyProvider({

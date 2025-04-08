@@ -235,6 +235,7 @@ async function sendApiMessage(text: string) {
       role: 'user' as const,
       content: text,
       timestamp: new Date(),
+      status: 'success',
       sessionId: currentSessionId.value
     };
     addMessage(userMessage);
@@ -243,7 +244,7 @@ async function sendApiMessage(text: string) {
     const assistantMessage = reactive({
       role: 'assistant' as const,
       content: '',
-      status: 'sending' as const,
+      status: 'sending',
       timestamp: new Date(),
       sessionId: currentSessionId.value
     });

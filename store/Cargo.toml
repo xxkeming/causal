@@ -1,0 +1,17 @@
+[package]
+name = "store"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "BonsaiDB storage backend for Causal application"
+
+[dependencies]
+bonsaidb = { version = "0.5.0", features = ["local-full"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "*"

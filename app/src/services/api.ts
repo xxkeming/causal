@@ -8,9 +8,6 @@ import { Provider } from './typings';
 // 导入Tauri API
 import * as tauriApi from './tauriApi';
 
-// 导入模型提供商数据
-import { mockProviders } from './mock/providerData';
-
 // 获取所有智能体分类
 export async function getAgentCategories(): Promise<AgentCategory[]> {
   return new Promise((resolve) => {
@@ -331,56 +328,36 @@ export async function getKnowledgeBaseCategories(): Promise<KnowledgeBaseCategor
 // 模型提供商相关 API
 // 获取所有模型提供商
 export async function getAllProviders(): Promise<Provider[]> {
-  return new Promise((resolve) => {
-    resolve([...mockProviders]); // 返回副本以避免引用问题
-  });
+  return tauriApi.fetch_local('provider.list', null) as Promise<Provider[]>;
 }
 
 // 获取单个模型提供商详情
 export async function getProviderById(id: number): Promise<Provider | null> {
-  return new Promise((resolve) => {
-    const provider = mockProviders.find(p => p.id === id);
-    resolve(provider ? {...provider} : null);
-  });
+  return tauriApi.fetch_local('provider.get', {id}) as Promise<Provider>;
 }
 
 // 添加模型提供商
-export async function addProvider(providerData: Omit<Provider, 'id'>): Promise<Provider> {
-  return new Promise((resolve) => {
-    const newId = Math.max(0, ...mockProviders.map(p => p.id)) + 1;
-    const newProvider = {
-      id: newId,
-      ...providerData
-    };
-    mockProviders.push(newProvider);
-    resolve({...newProvider});
-  });
+export async function addProvider(providerData: Omit<Provider, 'id'>): Promise<boolean> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
+
+  const newProvider = {
+    id: newId,
+    createdAt: timestamp,
+    ...providerData
+  };
+  return tauriApi.fetch_local('provider.add', newProvider) as Promise<boolean>;
 }
 
 // 更新模型提供商
-export async function updateProvider(providerData: Provider): Promise<Provider> {
-  return new Promise((resolve, reject) => {
-    const index = mockProviders.findIndex(p => p.id === providerData.id);
-    if (index !== -1) {
-      mockProviders[index] = {...providerData};
-      resolve({...mockProviders[index]});
-    } else {
-      reject(new Error('Provider not found'));
-    }
-  });
+export async function updateProvider(providerData: Provider): Promise<boolean> {
+  return tauriApi.fetch_local('provider.update', providerData) as Promise<boolean>;
 }
 
 // 删除模型提供商
 export async function deleteProvider(id: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const index = mockProviders.findIndex(p => p.id === id);
-    if (index !== -1) {
-      mockProviders.splice(index, 1);
-      resolve(true);
-    } else {
-      resolve(false);
-    }
-  });
+  return tauriApi.fetch_local('provider.delete', id) as Promise<boolean>;
 }
 
 // 模拟流式输出的聊天接口（逐字输出，间隔10毫秒）
@@ -403,6 +380,5 @@ export function simulateChatStream(input: string, onData: (chunk: string) => voi
 }
 
 // 导出Tauri相关API
-export const greet = tauriApi.greet;
 export const isTauriAvailable = tauriApi.isTauriAvailable;
 export const safeTauriCall = tauriApi.safeTauriCall;

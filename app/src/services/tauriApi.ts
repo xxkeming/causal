@@ -1,16 +1,31 @@
 import { invoke } from "@tauri-apps/api/core";
 
+interface Response {
+  status: string;
+  data?: Object;
+  error?: string;
+}
+
 /**
- * 调用Tauri后端的greet函数
+ * 调用Tauri后端的fetch_local函数
  * @param name 要问候的名称
+ * @param data 附加数据
  * @returns 返回问候语的Promise
  */
-export async function greet(name: string): Promise<string> {
+export async function fetch_local(name: string, data: Object | null): Promise<Object> {
   try {
-    // 调用Rust端定义的greet命令
-    return await invoke('greet', { name });
+    console.log('fetch_local:', name, data);
+
+    // data 转json字符串
+    let result = await invoke('fetch_local', { name, data: data === null ? "" : JSON.stringify(data)}) as Response;
+    console.log('fetch_local result:', result);
+
+    if (result.status === "error") {
+      throw 'error:' + result.error;
+    }
+    return result.data === undefined ? true : result.data as Object;
   } catch (error) {
-    console.error('Failed to call Tauri greet function:', error);
+    console.error('Failed to call fetch_local function:', error);
     throw error;
   }
 }

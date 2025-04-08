@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { Provider } from '../services/typings';
 import { 
   getAllProviders, getProviderById, addProvider, 
@@ -14,20 +14,6 @@ export const useProviderStore = defineStore('provider', () => {
   const providers = ref<Provider[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const searchKeyword = ref<string>('');
-  
-  // 计算属性：按搜索关键词过滤后的提供商
-  const displayProviders = computed(() => {
-    if (!searchKeyword.value) {
-      return providers.value;
-    }
-    
-    const keyword = searchKeyword.value.toLowerCase();
-    return providers.value.filter(provider => 
-      provider.name.toLowerCase().includes(keyword) || 
-      provider.apiCategory.toLowerCase().includes(keyword)
-    );
-  });
   
   // 获取所有提供商
   async function fetchAllProviders() {
@@ -73,9 +59,8 @@ export const useProviderStore = defineStore('provider', () => {
     error.value = null;
     
     try {
-      const newProvider = await addProvider(providerData);
-      providers.value.push(newProvider);
-      return newProvider;
+      await addProvider(providerData);
+      providers.value = await getAllProviders();
     } catch (err) {
       console.error('Failed to create provider:', err);
       error.value = '创建模型提供商失败';
@@ -91,12 +76,11 @@ export const useProviderStore = defineStore('provider', () => {
     error.value = null;
     
     try {
-      const updatedProvider = await updateProvider(providerData);
-      const index = providers.value.findIndex(p => p.id === updatedProvider.id);
+      await updateProvider(providerData);
+      const index = providers.value.findIndex(p => p.id === providerData.id);
       if (index !== -1) {
-        providers.value[index] = updatedProvider;
+        providers.value[index] = providerData;
       }
-      return updatedProvider;
     } catch (err) {
       console.error(`Failed to update provider with id ${providerData.id}:`, err);
       error.value = '更新模型提供商失败';
@@ -126,22 +110,14 @@ export const useProviderStore = defineStore('provider', () => {
     }
   }
   
-  // 设置搜索关键词
-  function setSearchKeyword(keyword: string) {
-    searchKeyword.value = keyword;
-  }
-  
   return {
     providers,
     loading,
     error,
-    searchKeyword,
-    displayProviders,
     fetchAllProviders,
     fetchProviderById,
     createProvider,
     modifyProvider,
-    removeProvider,
-    setSearchKeyword
+    removeProvider
   };
 });

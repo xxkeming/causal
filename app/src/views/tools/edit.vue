@@ -270,8 +270,6 @@ import CodeEditor from '../../components/CodeEditor.vue';
 import LogViewer, { LogEntry } from '../../components/LogViewer.vue';
 import { useGlobalStore } from '../../stores/globalStore';
 
-import { greet } from '../../services/api';
-
 // 修复表单规则类型
 import type { FormRules, FormItemRule } from 'naive-ui';
 
@@ -523,8 +521,6 @@ async function testCode() {
     }, {});
 
     addTestLog('info', '参数信息', JSON.stringify(params, null, 2) );
-
-    await greet(JSON.stringify(params));
 
     // 添加执行日志
     addTestLog('info', '代码执行', '开始执行工具函数...');

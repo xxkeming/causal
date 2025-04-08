@@ -6,7 +6,7 @@ const ProviderApiCategory = ['OpenAI', "Gemini", "Anthropic", "Xai", "Ollama", "
 */
 
 // 模型名, 标签包含 [推理,向量,图片]
-export interface ProviderModel {
+export interface Model {
   name: string;
   tags: string[];
 }
@@ -24,11 +24,11 @@ export interface Provider {
   url: string;
   apiKey?: string;
 
-  models?: ProviderModel[];
+  models?: Model[];
 }
 
 // 模型
-export interface Model {
+export interface ProviderModel {
   // id 为providerId
   id: number;
   // name 为模型名称
@@ -60,7 +60,7 @@ export interface Agent {
   description?: string;
 
   // 模型通过providerId和name获取
-  model?: Model;
+  model?: ProviderModel;
 
   // 提示词
   prompt: string;
@@ -184,7 +184,7 @@ export interface ChatMessage {
 
   role: 'user' | 'assistant' | 'system';
   content: string;
-  status?: 'sending' | 'success' | 'error';
+  status: string;
   timestamp?: Date;
 }
 

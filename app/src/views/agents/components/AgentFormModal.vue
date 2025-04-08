@@ -429,7 +429,7 @@ import {
   SettingsOutline, OptionsOutline, BuildOutline, CodeOutline,
   AddCircleOutline, CreateOutline
 } from '@vicons/ionicons5';
-import { Agent, Model, ModelParam } from '../../../services/typings';
+import { Agent, ModelParam, ProviderModel } from '../../../services/typings';
 import { useAgentCategoryStore } from '../../../stores/agentCategoryStore';
 import AvatarSelector from '../../../components/AvatarSelector.vue';
 import ModelSelector from '../../../components/ModelSelector.vue';
@@ -473,7 +473,7 @@ const formModel = reactive<{
   description: string;
   categoryId: string;
   iconId: number; // 将 avatarId 改为 iconId
-  model?: Model;
+  model?: ProviderModel;
   prompt: string;
   temperature: number;
   topP: number;

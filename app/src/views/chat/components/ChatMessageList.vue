@@ -85,7 +85,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { 
-  NAvatar, NIcon, NButton, NText, NSpin 
+  NAvatar, NIcon, NButton, NText 
 } from 'naive-ui';
 import { ServerOutline, PersonOutline, AlertCircleOutline } from '@vicons/ionicons5';
 import MarkdownRenderer from '../../../components/MarkdownRenderer.vue';

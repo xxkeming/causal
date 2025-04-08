@@ -29,9 +29,10 @@
               :key="category.id"
               class="category-item"
               :class="{ active: selectedCategory === category.id }"
+              @click="handleSelectCategory(category.id)"
             >
               <div class="category-content category-item-wrapper">
-                <span class="category-name" @click="handleSelectCategory(category.id)">
+                <span class="category-name">
                   {{ category.name }}
                 </span>
                 <n-button 

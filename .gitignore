@@ -24,5 +24,6 @@ dist-ssr
 *.sw?
 package-lock.json
 
+app/src-tauri/store-tmp/
 target
 Cargo.lock
