@@ -15,8 +15,8 @@
             <!-- 所有智能体选项 -->
             <n-list-item 
               class="category-item"
-              :class="{ active: selectedCategory === 'all' }"
-              @click="handleSelectCategory('all')"
+              :class="{ active: selectedCategory === 0 }"
+              @click="handleSelectCategory(0)"
             >
               <div class="category-content">
                 所有智能体
@@ -174,7 +174,7 @@
   </template>
 
   <script setup lang="ts">
-  import { ref, computed, onMounted, watch } from 'vue';
+  import { ref, computed, onMounted } from 'vue';
   import { 
     NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
     NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
@@ -204,7 +204,7 @@
 
   // 本地状态
   const searchKeyword = ref<string>('');
-  const selectedCategory = ref<string>('all');
+  const selectedCategory = ref<number>(0);
   const showAddCategoryModal = ref<boolean>(false);
   const showDeleteCategoryModal = ref<boolean>(false);
   const categoryToDelete = ref<AgentCategory | null>(null);
@@ -214,7 +214,7 @@
     let result = agentStore.agents;
     
     // 先按分类筛选
-    if (selectedCategory.value !== 'all') {
+    if (selectedCategory.value !== 0) {
       result = result.filter(agent => agent.categoryId === selectedCategory.value);
     }
     
@@ -235,11 +235,11 @@
     if (searchKeyword.value) {
       return '没有找到匹配的智能体';
     }
-    return selectedCategory.value === 'all' ? '暂无智能体' : '该分类下暂无智能体';
+    return selectedCategory.value === 0 ? '暂无智能体' : '该分类下暂无智能体';
   });
 
   // 处理分类选择 - 简化为仅更新本地状态
-  async function handleSelectCategory(categoryId: string) {
+  async function handleSelectCategory(categoryId: number) {
     selectedCategory.value = categoryId;
   }
 
@@ -265,11 +265,12 @@
     try {
       const success = await categoryStore.removeCategory(categoryId);
       if (success) {
+        await agentStore.removeAgentByCategory(categoryId);
+
         // 如果当前选中的是被删除的类别，则切换到"所有智能体"
         if (selectedCategory.value === categoryId) {
-          selectedCategory.value = 'all';
+          selectedCategory.value = 0;
         }
-      
         message.success('类别已删除');
       } else {
         message.error('删除类别失败');
@@ -335,9 +336,6 @@
 
       // 成功时才关闭窗口
       showAgentModal.value = false;
-
-      // 刷新智能体列表
-      // await agentStore.fetchAllAgents();
     } catch (error) {
       console.error('Failed to submit agent form:', error);
       message.error(isEditingAgent.value ? '更新智能体失败:' + error : '创建智能体失败:' + error);
@@ -356,13 +354,6 @@
     }
     return null;
   }
-
-  // 监听需要刷新状态，简化为只获取全部数据
-  watch(() => agentStore.needRefresh, (needRefresh) => {
-    if (needRefresh) {
-      agentStore.fetchAllAgents();
-    }
-  }, { immediate: false }); 
 
   // 在组件挂载时加载数据 - 只获取所有智能体数据
   onMounted(async () => {

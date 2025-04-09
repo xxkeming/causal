@@ -10,7 +10,7 @@ export const useChatSessionStore = defineStore('chatSession', () => {
   const needRefresh = ref(false);
   
   // 计算属性
-  const getSessionsByAgentId = (agentId: string) => {
+  const getSessionsByAgentId = (agentId: number) => {
     return sessions.value.filter(s => s.agentId === agentId);
   };
   
@@ -46,7 +46,7 @@ export const useChatSessionStore = defineStore('chatSession', () => {
   }
   
   // 创建新的会话
-  async function createNewSession(agentId: string, topic: string): Promise<ChatSession> {
+  async function createNewSession(agentId: number, topic: string): Promise<ChatSession> {
     const now = new Date().toISOString();
     const newSession: ChatSession = {
       id: generateSessionId(),

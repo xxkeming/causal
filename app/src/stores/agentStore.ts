@@ -2,8 +2,8 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Agent } from '../services/typings';
 import { 
-  getAllAgents, getAgentById,
-  addAgent, updateAgent, deleteAgent 
+  getAllAgents,
+  addAgent, updateAgent, deleteAgent ,deleteAgentByCategory
 } from '../services/api';
 
 export const useAgentStore = defineStore('agent', () => {
@@ -11,7 +11,6 @@ export const useAgentStore = defineStore('agent', () => {
   const agents = ref<Agent[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const needRefresh = ref(false);
   
   // 获取所有智能体 - 作为主要的数据获取方法
   async function fetchAllAgents() {
@@ -19,9 +18,10 @@ export const useAgentStore = defineStore('agent', () => {
     error.value = null;
     
     try {
-      console.log('Fetching all agents...');
-      agents.value = await getAllAgents();
-      needRefresh.value = false;
+      if (agents.value.length === 0) {
+        // 如果本地列表为空，则直接获取
+        agents.value = await getAllAgents();
+      }
     } catch (err) {
       console.error('Failed to fetch agents:', err);
       error.value = '获取智能体失败';
@@ -31,13 +31,18 @@ export const useAgentStore = defineStore('agent', () => {
   }
   
   // 获取单个智能体详情
-  async function fetchAgentById(id: string) {
+  async function fetchAgentById(id: number) {
     loading.value = true;
     error.value = null;
     
     try {
-      const agent = await getAgentById(id);
-      return agent;
+      const agentIndex = agents.value.findIndex(a => a.id === id);
+      if (agentIndex === -1) {
+        // 如果已经在本地列表中，直接返回
+        throw new Error(`Agent with id ${id} not found in local list`);
+      }
+
+      return agents.value[agentIndex];
     } catch (err) {
       console.error(`Failed to fetch agent with id ${id}:`, err);
       error.value = '获取智能体详情失败';
@@ -59,9 +64,8 @@ export const useAgentStore = defineStore('agent', () => {
         throw('已存在同名智能体');
       }
 
-      const newAgent = await addAgent(agentData);
-      agents.value.push(newAgent);
-      return newAgent;
+      await addAgent(agentData);
+      agents.value = await getAllAgents();
     } catch (err) {
       console.error('Failed to create agent:', err);
       error.value = '创建智能体失败';
@@ -77,15 +81,19 @@ export const useAgentStore = defineStore('agent', () => {
     error.value = null;
     
     try {
-      const updatedAgent = await updateAgent(agentData);
+      const index = agents.value.findIndex(a => a.id === agentData.id);
+      if (index === -1) {
+        throw new Error(`Agent with id ${agentData.id} not found in local list`);
+      }
+
+      const newAgentData = {
+        ...agents.value[index],
+        ...agentData
+      };
+      await updateAgent(newAgentData);
       
       // 更新本地列表中的对应项
-      const index = agents.value.findIndex(a => a.id === updatedAgent.id);
-      if (index !== -1) {
-        agents.value[index] = updatedAgent;
-      }
-      
-      return updatedAgent;
+      agents.value[index] = newAgentData;
     } catch (err) {
       console.error(`Failed to update agent with id ${agentData.id}:`, err);
       error.value = '更新智能体失败';
@@ -96,7 +104,7 @@ export const useAgentStore = defineStore('agent', () => {
   }
   
   // 删除智能体
-  async function removeAgent(id: string) {
+  async function removeAgent(id: number) {
     loading.value = true;
     error.value = null;
     
@@ -118,21 +126,32 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
   
-  // 设置需要刷新标志
-  function setNeedRefresh() {
-    needRefresh.value = true;
+  // 通过类别删除智能体
+  async function removeAgentByCategory(categoryId: number) {
+    loading.value = true;
+    error.value = null;
+    
+    try {
+      await deleteAgentByCategory(categoryId);
+      
+      // 从本地列表中移除
+      agents.value = agents.value.filter(a => a.categoryId !== categoryId);
+    } catch (err) {
+      console.error(`Failed to delete agents by category ${categoryId}:`, err);
+      error.value = '删除智能体失败';
+    } finally {
+      loading.value = false;
+    }
   }
-  
   return {
     agents,
     loading,
     error,
-    needRefresh,
     fetchAllAgents,
     fetchAgentById,
     createAgent,
     modifyAgent,
     removeAgent,
-    setNeedRefresh
+    removeAgentByCategory
   };
 });

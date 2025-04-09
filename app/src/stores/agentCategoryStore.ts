@@ -33,10 +33,9 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
     error.value = null;
     
     try {
-      const newCategory = await addAgentCategory({ name });
+      await addAgentCategory({ name });
       // 直接添加到本地数组，确保界面立即更新
-      categories.value.push(newCategory);
-      return newCategory;
+      categories.value = await getAgentCategories();
     } catch (err) {
       console.error('Failed to add agent category:', err);
       error.value = '添加类别失败';
@@ -47,7 +46,7 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
   }
   
   // 删除智能体类别
-  async function removeCategory(categoryId: string) {
+  async function removeCategory(categoryId: number) {
     loading.value = true;
     error.value = null;
     

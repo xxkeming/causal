@@ -3,19 +3,19 @@ import { Agent, AgentCategory } from '../typings';
 // 智能体分类模拟数据
 export const mockCategories: AgentCategory[] = [
   {
-    id: "1",
+    id: 1,
     name: "办公助手"
   },
   {
-    id: "2",
+    id: 2,
     name: "生产力"
   },
   {
-    id: "3", 
+    id: 3, 
     name: "创意写作"
   },
   {
-    id: "4",
+    id: 4,
     name: "数据分析"
   }
 ];
@@ -23,11 +23,11 @@ export const mockCategories: AgentCategory[] = [
 // 智能体模拟数据，按照新的Model结构
 export const mockAgents: Agent[] = [
   {
-    id: "1",
+    id: 1,
     name: "文档助手",
     description: "帮助你撰写、编辑和改进文档内容",
     iconId: 15, // 对应图标库中的图标ID
-    categoryId: "1",
+    categoryId: 1,
     model: {
       id: 1, // 对应提供商ID
       name: "gpt-3.5-turbo" // 对应模型名称
@@ -49,11 +49,11 @@ export const mockAgents: Agent[] = [
     createdAt: "2023-10-05T08:30:00Z"
   },
   {
-    id: "2",
+    id: 2,
     name: "数据分析师",
     description: "分析数据并提供可视化建议",
     iconId: 33,
-    categoryId: "4",
+    categoryId: 4,
     model: {
       id: 1,
       name: "gpt-4"
@@ -80,11 +80,11 @@ export const mockAgents: Agent[] = [
     createdAt: "2023-11-12T14:45:00Z"
   },
   {
-    id: "3",
+    id: 3,
     name: "创意写作助手",
     description: "帮助创作故事、诗歌和各类创意内容",
     iconId: 3,
-    categoryId: "3",
+    categoryId: 3,
     model: {
       id: 2,
       name: "qwen-plus"
@@ -111,11 +111,11 @@ export const mockAgents: Agent[] = [
     createdAt: "2023-12-03T09:20:00Z"
   },
   {
-    id: "4",
+    id: 4,
     name: "会议记录助手",
     description: "帮助记录和整理会议内容",
     iconId: 28,
-    categoryId: "1",
+    categoryId: 1,
     model: {
       id: 1,
       name: "gpt-3.5-turbo"
@@ -137,11 +137,11 @@ export const mockAgents: Agent[] = [
     createdAt: "2024-01-15T10:30:00Z"
   },
   {
-    id: "5",
+    id: 5,
     name: "代码助手",
     description: "提供编程帮助和代码建议",
     iconId: 31,
-    categoryId: "2",
+    categoryId: 2,
     model: {
       id: 1,
       name: "gpt-4"

@@ -80,16 +80,16 @@ import { useIconStore } from '../stores/iconStore';
 
 const props = defineProps<{
   visible: boolean;
-  currentAgentId?: string;
+  currentAgentId?: number;
   title?: string;
 }>();
 
 const emit = defineEmits(['update:visible', 'select']);
 
 // 内部状态
-const selectedAgentId = ref<string | null>(null);
+const selectedAgentId = ref<number | null>(null);
 const searchKeyword = ref('');
-const selectedCategory = ref<string>('all');
+const selectedCategory = ref<number>(0);
 const showModal = ref(false);
 
 // Store
@@ -119,7 +119,7 @@ const filteredAgents = computed(() => {
   let result = agentStore.agents;
   
   // 按分类筛选
-  if (selectedCategory.value && selectedCategory.value !== 'all') {
+  if (selectedCategory.value && selectedCategory.value !== 0) {
     result = result.filter(agent => agent.categoryId === selectedCategory.value);
   }
   
@@ -139,7 +139,7 @@ const filteredAgents = computed(() => {
 const categoryOptions = computed(() => {
   const options = [{
     label: '全部分类',
-    value: 'all'
+    value: 0
   }];
   
   return options.concat(categoryStore.categories.map(cat => ({

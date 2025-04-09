@@ -10,116 +10,66 @@ import * as tauriApi from './tauriApi';
 
 // 获取所有智能体分类
 export async function getAgentCategories(): Promise<AgentCategory[]> {
-  return new Promise((resolve) => {
-    resolve(structuredClone(mockCategories));
-  });
+  return tauriApi.fetch_local('agent.category.list', null) as Promise<AgentCategory[]>;
 }
 
-// 根据分类获取智能体
-export async function getAgentsByCategory(categoryId: string): Promise<Agent[]> {
-  return new Promise((resolve) => {
-    if (categoryId === 'all') {
-      resolve(mockAgents);
-    } else {
-      const filteredAgents = mockAgents.filter(agent => agent.categoryId === categoryId);
-      resolve(filteredAgents);
-    }
-  });
+// 添加智能体类别
+export async function addAgentCategory(category: Pick<AgentCategory, 'name'>): Promise<boolean> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
+  
+  const newCategory: AgentCategory = {
+    id: newId,
+    name: category.name,
+    createdAt: timestamp,
+  };
+
+  return tauriApi.fetch_local('agent.category.add', newCategory) as Promise<boolean>;
+}
+
+// 删除智能体类别
+export async function deleteAgentCategory(categoryId: number): Promise<boolean> {
+  return tauriApi.fetch_local('agent.category.delete', categoryId) as Promise<boolean>;
 }
 
 // 获取所有智能体
 export async function getAllAgents(): Promise<Agent[]> {
-  return new Promise((resolve) => {
-    resolve(mockAgents);
-  });
-}
-
-// 获取单个智能体详情
-export async function getAgentById(id: string): Promise<Agent | null> {
-  return new Promise((resolve) => {
-    const agent = mockAgents.find(a => a.id === id);
-    resolve(agent ? agent : null);
-  });
+  return tauriApi.fetch_local('agent.list', null) as Promise<Agent[]>;
 }
 
 // 添加智能体
-export async function addAgent(agent: Omit<Agent, 'id' | 'createdAt'>): Promise<Agent> {
-  return new Promise((resolve) => {
-    const newId = String(Math.max(...mockAgents.map(a => parseInt(a.id))) + 1);
-    const createdAt = new Date().toISOString();
-    
-    const newAgent: Agent = {
-      id: newId,
-      createdAt,
-      ...agent
-    };
-    
-    mockAgents.push(newAgent);
-    resolve(newAgent);
-  });
+export async function addAgent(agent: Omit<Agent, 'id' | 'createdAt'>): Promise<boolean> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
+  
+  const newAgent: Agent = {
+    id: newId,
+    createdAt: timestamp,
+    ...agent
+  };
+  return tauriApi.fetch_local('agent.add', newAgent) as Promise<boolean>;
 }
 
 // 更新智能体
-export async function updateAgent(agent: Agent): Promise<Agent> {
-  return new Promise((resolve, reject) => {
-    const index = mockAgents.findIndex(a => a.id === agent.id);
-    
-    if (index === -1) {
-      reject(new Error('Agent not found'));
-      return;
-    }
-    
-    const updatedAgent = {
-      ...mockAgents[index],
-      ...agent,
-      updatedAt: new Date().toISOString()
-    };
-    
-    mockAgents[index] = updatedAgent;
-    resolve(updatedAgent);
-  });
+export async function updateAgent(agent: Agent): Promise<boolean> {
+  const timestamp = Date.now();
+  const updatedAgent = {
+    ...agent,
+    updatedAt: timestamp
+  };
+  return tauriApi.fetch_local('agent.update', updatedAgent) as Promise<boolean>;
 }
 
 // 删除智能体
-export async function deleteAgent(id: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    // const initialLength = mockAgents.length;
-    const index = mockAgents.findIndex(a => a.id === id);
-    
-    if (index !== -1) {
-      mockAgents.splice(index, 1);
-      resolve(true);
-    } else {
-      resolve(false);
-    }
-  });
+export async function deleteAgent(id: number): Promise<boolean> {
+  return tauriApi.fetch_local('agent.delete', id) as Promise<boolean>;
 }
 
-// 添加智能体类别
-export async function addAgentCategory(category: Pick<AgentCategory, 'name'>): Promise<AgentCategory> {
-  return new Promise((resolve) => {
-    // 确保ID是唯一的
-    const newCategory: AgentCategory = {
-      id: `${mockCategories.length + 1}`,
-      name: category.name
-    };
-    // 添加到模拟数据中
-    mockCategories.push(newCategory);
-    resolve(structuredClone(newCategory));
-  });
-}
-
-// 删除智能体类别
-export async function deleteAgentCategory(categoryId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const index = mockCategories.findIndex(cat => cat.id === categoryId);
-    if (index !== -1) {
-      mockCategories.splice(index, 1);
-      resolve(true);
-    } else {
-      resolve(false);
-    }
-  });
+// 通过类别删除智能体
+export async function deleteAgentByCategory(categoryId: number): Promise<boolean> {
+  return tauriApi.fetch_local('agent.delete.by.category', categoryId) as Promise<boolean>;
 }
 
 // 工具相关API接口

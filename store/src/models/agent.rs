@@ -1,23 +1,22 @@
 use bonsaidb::core::schema::Collection;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// 智能体类别
-#[derive(Debug, Serialize, Deserialize, Collection)]
-#[collection(name = "agent_categories")]
+#[derive(Debug, Serialize, Deserialize, Collection, Clone)]
+#[collection(name = "agent_categories", primary_key = u64)]
 pub struct AgentCategory {
     /// 类别ID
-    pub id: String,
+    #[natural_id]
+    pub id: u64,
     /// 类别名称
     pub name: String,
     /// 创建时间
-    pub created_at: DateTime<Utc>,
-    /// 更新时间
-    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(rename = "createdAt")]
+    pub created_at: i64,
 }
 
 /// 模型
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProviderModel {
     /// 主键ID（对应provider的ID）
     pub id: u64,
@@ -37,14 +36,17 @@ pub struct ModelParam {
 }
 
 /// 智能体
-#[derive(Debug, Serialize, Deserialize, Collection)]
+#[derive(Debug, Serialize, Deserialize, Collection, Clone)]
 #[collection(name = "agents")]
 pub struct Agent {
     /// 智能体ID
-    pub id: String,
+    #[natural_id]
+    pub id: u64,
     /// 所属类别ID
-    pub category_id: String,
+    #[serde(rename = "categoryId")]
+    pub category_id: u64,
     /// 图标ID
+    #[serde(rename = "iconId")]
     pub icon_id: Option<u64>,
     /// 名称
     pub name: String,
@@ -57,19 +59,25 @@ pub struct Agent {
     /// 生成文本的随机程度(0-2)
     pub temperature: f64,
     /// 词汇多样性(0-1)
+    #[serde(rename = "topP")]
     pub top_p: f64,
     /// Token数量，值越大回复内容越多
+    #[serde(rename = "topK")]
     pub top_k: u32,
     /// 最大消息长度，0表示不限制
+    #[serde(rename = "maxTokens")]
     pub max_tokens: u32,
     /// 上下文保留消息数量
+    #[serde(rename = "contextSize")]
     pub context_size: u32,
     /// 自定义参数
     pub params: Option<Vec<ModelParam>>,
     /// 工具集合
     pub tools: Option<Vec<u64>>,
-    /// 创建时间
-    pub created_at: DateTime<Utc>,
+    /// 创建时间, 单位秒
+    #[serde(rename = "createdAt")]
+    pub created_at: i64,
     /// 更新时间
-    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<i64>,
 }

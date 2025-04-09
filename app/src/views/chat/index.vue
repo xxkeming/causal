@@ -424,13 +424,8 @@ async function handleModelChange(newModel: any) {
       }
     };
 
-    const success = await agentStore.modifyAgent(newAgent);
-    
-    if (success) {
-      agent.value.model = newModel;
-    } else {
-      message.error('模型更改失败');
-    }
+    await agentStore.modifyAgent(newAgent);
+    agent.value.model = newAgent.model;
   } catch (error) {
     console.error('切换模型时出错:', error);
     message.error('切换模型时出错');
@@ -449,20 +444,16 @@ async function handleAgentConfigSubmit(updatedAgent: Agent) {
   try {
     loading.value = true;
     
-    const success = await agentStore.modifyAgent(updatedAgent);
+    await agentStore.modifyAgent(updatedAgent);
     
-    if (success) {
-      // 修改：使用从服务器返回的完整智能体信息更新本地状态
-      agent.value = await agentStore.fetchAgentById(updatedAgent.id);
+    // 修改：使用从服务器返回的完整智能体信息更新本地状态
+    agent.value = await agentStore.fetchAgentById(updatedAgent.id);
 
-      // 更改ChatSidebar组件的key，强制重新渲染
-      forceUpdate.value += 1;
-      
-      message.success('智能体配置已更新');
-      agentConfigVisible.value = false;
-    } else {
-      message.error('更新智能体配置失败');
-    }
+    // 更改ChatSidebar组件的key，强制重新渲染
+    forceUpdate.value += 1;
+    
+    message.success('智能体配置已更新');
+    agentConfigVisible.value = false;
   } catch (error) {
     console.error('更新智能体时出错:', error);
     message.error('更新智能体失败');

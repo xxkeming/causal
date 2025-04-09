@@ -28,11 +28,7 @@
       :mask-closable="true"
     >
       <div class="avatar-selector">
-        <div class="avatar-selector-header">
-          <n-button text size="small" @click="randomizeAvatar" v-if="showRandom">
-            随机选择
-          </n-button>
-        </div>
+        <!-- 移除了头部的随机选择按钮 -->
         
         <div class="avatar-grid">
           <div 
@@ -40,7 +36,7 @@
             :key="icon.id" 
             class="avatar-item"
             :class="{ 'avatar-selected': tempSelectedAvatar === icon.id }"
-            @click="selectTempAvatar(icon)"
+            @click="selectAndConfirmAvatar(icon)"
           >
             <n-avatar 
               :color="icon.color" 
@@ -53,11 +49,6 @@
             </n-avatar>
           </div>
         </div>
-
-        <div class="avatar-selector-footer">
-          <n-button @click="showPopover = false">取消</n-button>
-          <n-button type="primary" @click="confirmSelection">确定</n-button>
-        </div>
       </div>
     </n-modal>
   </div>
@@ -65,7 +56,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { NAvatar, NIcon, NButton, NModal } from 'naive-ui';
+import { NAvatar, NIcon, NModal } from 'naive-ui';
 import { PersonOutline, PencilOutline } from '@vicons/ionicons5';
 import { useIconStore, IconOption } from '../stores/iconStore';
 
@@ -84,7 +75,7 @@ const props = defineProps({
   },
   showRandom: {
     type: Boolean,
-    default: true
+    default: false  // 设置默认为false，不显示随机功能
   },
   previewSize: {
     type: Number,
@@ -109,27 +100,12 @@ watch(() => props.modelValue, (val) => {
   tempSelectedAvatar.value = val;
 });
 
-// 临时选择头像
-const selectTempAvatar = (icon: IconOption) => {
+// 选择并直接确认头像 - 合并了选择和确认功能
+const selectAndConfirmAvatar = (icon: IconOption) => {
   tempSelectedAvatar.value = icon.id;
-};
-
-// 确认选择
-const confirmSelection = () => {
-  const selectedIcon = iconStore.getIconById(tempSelectedAvatar.value);
-  if (selectedIcon) {
-    emit('update:modelValue', selectedIcon.id);
-    emit('change', selectedIcon);
-  }
+  emit('update:modelValue', icon.id);
+  emit('change', icon);
   showPopover.value = false;
-};
-
-// 随机选择一个头像
-const randomizeAvatar = () => {
-  const icons = iconStore.icons;
-  const randomIndex = Math.floor(Math.random() * icons.length);
-  const randomIcon = icons[randomIndex];
-  selectTempAvatar(randomIcon);
 };
 
 // 获取当前选中的头像
@@ -141,7 +117,6 @@ const currentAvatar = computed(() => {
 defineExpose({
   icons: iconStore.icons,
   currentAvatar,
-  randomizeAvatar,
   openSelector: () => { showPopover.value = true; }
 });
 </script>
@@ -185,13 +160,6 @@ defineExpose({
   padding: 0;
 }
 
-.avatar-selector-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
 .avatar-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
@@ -226,13 +194,6 @@ defineExpose({
 .avatar-selected {
   background-color: rgba(24, 160, 88, 0.1);
   box-shadow: 0 0 0 2px rgba(24, 160, 88, 0.5);
-}
-
-.avatar-selector-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 8px;
 }
 
 :deep(.n-avatar) {

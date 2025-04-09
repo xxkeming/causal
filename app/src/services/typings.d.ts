@@ -47,8 +47,8 @@ export interface ModelParam {
 
 // 智能体
 export interface Agent {
-  id: string;
-  categoryId: string;
+  id: number;
+  categoryId: number;
 
   // 图标Id // 通过stores/iconsStore.ts中的icons获取 getIconById(agent.iconId)
   iconId?: number;
@@ -90,14 +90,15 @@ export interface Agent {
   // 工具集合
   tools?: number[];
 
-  createdAt: string;
-  updatedAt?: string;
+  createdAt: i64;
+  updatedAt?: i64;
 }
 
 // 智能体类别
 export interface AgentCategory {
-  id: string;
+  id: number;
   name: string;
+  createdAt: i64;
 }
 
 
@@ -194,7 +195,7 @@ export interface ChatSession {
   id: number;
 
   // 智能体id
-  agentId: string;
+  agentId: number;
 
   // 会话主题
   topic: string;

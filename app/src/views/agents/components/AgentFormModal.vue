@@ -451,8 +451,8 @@ const props = defineProps({
     default: null
   },
   defaultCategoryId: {
-    type: String,
-    default: ''
+    type: Number,
+    default: null
   }
 });
 
@@ -471,7 +471,7 @@ const categoryStore = useAgentCategoryStore();
 const formModel = reactive<{
   name: string;
   description: string;
-  categoryId: string;
+  categoryId: number | null;
   iconId: number; // 将 avatarId 改为 iconId
   model?: ProviderModel;
   prompt: string;
@@ -485,7 +485,7 @@ const formModel = reactive<{
 }>({
   name: '',
   description: '',
-  categoryId: '',
+  categoryId: null,
   iconId: 0, // 将 avatarId 改为 iconId
   prompt: '',
   temperature: 0.7,
@@ -681,7 +681,7 @@ watch(() => props.visible, (visible) => {
     // 重置表单
     formModel.name = '';
     formModel.description = '';
-    formModel.categoryId = '';
+    formModel.categoryId = -1;
     formModel.iconId = 0;
     formModel.model = undefined;
     formModel.prompt = '';
@@ -728,7 +728,7 @@ watch(() => props.visible, (visible) => {
     }
   } else if (!props.isEdit) {
     // 非编辑模式打开时，如果有默认分类ID且不是'all'，则设置为默认分类
-    if (props.defaultCategoryId && props.defaultCategoryId !== 'all') {
+    if (props.defaultCategoryId && props.defaultCategoryId !== 0) {
       formModel.categoryId = props.defaultCategoryId;
     }
   }
