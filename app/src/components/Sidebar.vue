@@ -37,14 +37,14 @@
         工具
       </n-tooltip>
 
-      <n-tooltip placement="right" trigger="hover">
+      <!-- <n-tooltip placement="right" trigger="hover">
         <template #trigger>
           <div class="sidebar-icon" :class="{ active: activeIcon === 'knowledge' }" @click="setActive('knowledge')">
             <n-icon size="24"><BookOutline /></n-icon>
           </div>
         </template>
         知识库
-      </n-tooltip>
+      </n-tooltip> -->
       
     </div>
     

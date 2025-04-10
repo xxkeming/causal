@@ -4,19 +4,23 @@ import { Agent, AgentCategory } from '../typings';
 export const mockCategories: AgentCategory[] = [
   {
     id: 1,
-    name: "办公助手"
+    name: "办公助手",
+    createdAt: Date.now()
   },
   {
     id: 2,
-    name: "生产力"
+    name: "生产力",
+    createdAt: Date.now()
   },
   {
     id: 3, 
-    name: "创意写作"
+    name: "创意写作",
+    createdAt: Date.now()
   },
   {
     id: 4,
-    name: "数据分析"
+    name: "数据分析",
+    createdAt: Date.now()
   }
 ];
 

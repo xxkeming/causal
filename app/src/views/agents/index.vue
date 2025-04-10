@@ -480,7 +480,7 @@
     overflow: hidden;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    min-height: 200px; /* 确保卡片有一个最小高度，保持美观 */
+    min-height: 100px; /* 确保卡片有一个最小高度，保持美观 */
   }
 
   .agent-card:hover {

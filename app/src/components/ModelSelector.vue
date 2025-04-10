@@ -78,7 +78,7 @@ const providerStore = useProviderStore();
 const loading = ref(false);
 const selectedModel = ref<string | null>(props.defaultValue?.length ? props.defaultValue : props.modelValue);
 const selectedTags = ref<string[]>(props.defaultTags);
-const availableTags = ["推理", "向量", "图片"];
+const availableTags = ["推理", "工具", "向量", "图片"];
 
 // 过滤后的提供商选项
 const providerOptions = computed<CascaderOption[]>(() => {

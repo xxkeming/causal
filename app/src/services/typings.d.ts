@@ -107,10 +107,11 @@ export interface AgentCategory {
 export interface ToolCategory {
   id: number;
   name: string;
+  createdAt: number;
 }
 
 // 工具参数
-export interface ToolParam {
+export interface Param {
   // 参数名称
   name: string;
   // 参数类型 string, number, boolean, object
@@ -123,23 +124,39 @@ export interface ToolParam {
   testValue?: string;
 }
 
+// js
+export interface ToolScript {
+  param?: Param[];
+  code: string;
+}
+
+// mcp-io
+export interface ToolMcpIo {
+  path: string;
+}
+
+// mcp-sse
+export interface ToolMcpSse {
+  url: string;
+}
+
 // 工具
 export interface Tool {
   id: number;
-  categoryId?: number;
+  categoryId: number;
 
   // 图标Id // 通过stores/iconsStore.ts中的icons获取 getIconById(agent.iconId)
   iconId?: number;
 
   name: string;
   description: string;
-  param?: ToolParam[];
-  
-  // js代码, 执行工具的代码, 需要编辑
-  code: string;
 
-  createdAt: string;
-  updatedAt?: string;
+  // js, mcp-io, mcp-sse
+  type: string;
+  data: ToolScript | ToolMcpIo | ToolMcpSse;
+
+  createdAt: i64;
+  updatedAt?: i64;
 }
 
 // 知识库类型, 目前就固定的2个类型

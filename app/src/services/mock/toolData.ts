@@ -4,23 +4,28 @@ import { Tool, ToolCategory } from '../typings';
 export const mockToolCategories: ToolCategory[] = [
   {
     id: 1,
-    name: "网络工具"
+    name: "网络工具",
+    createdAt: Date.now()
   },
   {
     id: 2,
-    name: "数据处理"
+    name: "数据处理",
+    createdAt: Date.now()
   },
   {
     id: 3,
-    name: "开发工具"
+    name: "开发工具",
+    createdAt: Date.now()
   },
   {
     id: 4,
-    name: "文档工具"
+    name: "文档工具",
+    createdAt: Date.now()
   },
   {
     id: 5,
-    name: "媒体工具"
+    name: "媒体工具",
+    createdAt: Date.now()
   }
 ];
 
@@ -32,37 +37,39 @@ export const mockTools: Tool[] = [
     name: "HTTP请求工具",
     description: "发送HTTP请求，支持GET、POST、PUT、DELETE等方法",
     iconId: 18, // 使用CompassOutline图标
-    param: [
-      {
-        name: "url",
-        type: "string",
-        description: "请求地址URL",
-        required: true,
-        testValue: "https://api.example.com/data"
-      },
-      {
-        name: "method",
-        type: "string",
-        description: "HTTP请求方法",
-        required: true,
-        testValue: "GET"
-      },
-      {
-        name: "headers",
-        type: "object",
-        description: "请求头信息",
-        required: false,
-        testValue: '{"Content-Type": "application/json"}'
-      },
-      {
-        name: "body",
-        type: "string",
-        description: "请求体内容",
-        required: false,
-        testValue: '{"query": "test"}'
-      }
-    ],
-    code: `async function executeHttpRequest(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "url",
+          type: "string",
+          description: "请求地址URL",
+          required: true,
+          testValue: "https://api.example.com/data"
+        },
+        {
+          name: "method",
+          type: "string",
+          description: "HTTP请求方法",
+          required: true,
+          testValue: "GET"
+        },
+        {
+          name: "headers",
+          type: "object",
+          description: "请求头信息",
+          required: false,
+          testValue: '{"Content-Type": "application/json"}'
+        },
+        {
+          name: "body",
+          type: "string",
+          description: "请求体内容",
+          required: false,
+          testValue: '{"query": "test"}'
+        }
+      ],
+      code: `async function executeHttpRequest(params) {
   try {
     const options = {
       method: params.method,
@@ -86,7 +93,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-09-01",
     updatedAt: "2023-09-15"
   },
@@ -96,23 +104,25 @@ export const mockTools: Tool[] = [
     name: "网页爬取工具",
     description: "获取网页内容并提取文本和链接",
     iconId: 19, // 使用EarthOutline图标
-    param: [
-      {
-        name: "url",
-        type: "string",
-        description: "网页地址",
-        required: true,
-        testValue: "https://example.com"
-      },
-      {
-        name: "selector",
-        type: "string",
-        description: "CSS选择器，用于提取特定内容",
-        required: false,
-        testValue: ".main-content"
-      }
-    ],
-    code: `async function scrapeWebpage(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "url",
+          type: "string",
+          description: "网页地址",
+          required: true,
+          testValue: "https://example.com"
+        },
+        {
+          name: "selector",
+          type: "string",
+          description: "CSS选择器，用于提取特定内容",
+          required: false,
+          testValue: ".main-content"
+        }
+      ],
+      code: `async function scrapeWebpage(params) {
   try {
     const response = await fetch(params.url);
     const html = await response.text();
@@ -149,7 +159,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-09-02",
     updatedAt: "2023-09-16"
   },
@@ -159,23 +170,25 @@ export const mockTools: Tool[] = [
     name: "代码执行工具",
     description: "安全执行JavaScript代码并返回结果",
     iconId: 23, // 使用FlashOutline图标
-    param: [
-      {
-        name: "code",
-        type: "string",
-        description: "要执行的JavaScript代码",
-        required: true,
-        testValue: "return 2 + 2;"
-      },
-      {
-        name: "timeout",
-        type: "number",
-        description: "代码执行超时时间(毫秒)",
-        required: false,
-        testValue: "3000"
-      }
-    ],
-    code: `async function executeCode(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "code",
+          type: "string",
+          description: "要执行的JavaScript代码",
+          required: true,
+          testValue: "return 2 + 2;"
+        },
+        {
+          name: "timeout",
+          type: "number",
+          description: "代码执行超时时间(毫秒)",
+          required: false,
+          testValue: "3000"
+        }
+      ],
+      code: `async function executeCode(params) {
   try {
     // 创建安全的执行环境
     const timeout = params.timeout || 5000;
@@ -224,7 +237,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-09-03",
     updatedAt: "2023-09-17"
   },
@@ -234,30 +248,32 @@ export const mockTools: Tool[] = [
     name: "文件处理工具",
     description: "处理文本文件，支持读取和简单分析",
     iconId: 12, // 使用BuildOutline图标
-    param: [
-      {
-        name: "content",
-        type: "string",
-        description: "文件内容",
-        required: true,
-        testValue: "这是一段测试文本\n可以包含多行内容\n用于测试文件处理工具"
-      },
-      {
-        name: "operation",
-        type: "string",
-        description: "操作类型: analyze, count, extract",
-        required: true,
-        testValue: "analyze"
-      },
-      {
-        name: "pattern",
-        type: "string",
-        description: "提取时使用的正则表达式",
-        required: false,
-        testValue: "\\d+"
-      }
-    ],
-    code: `async function processFile(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "content",
+          type: "string",
+          description: "文件内容",
+          required: true,
+          testValue: "这是一段测试文本\n可以包含多行内容\n用于测试文件处理工具"
+        },
+        {
+          name: "operation",
+          type: "string",
+          description: "操作类型: analyze, count, extract",
+          required: true,
+          testValue: "analyze"
+        },
+        {
+          name: "pattern",
+          type: "string",
+          description: "提取时使用的正则表达式",
+          required: false,
+          testValue: "\\d+"
+        }
+      ],
+      code: `async function processFile(params) {
   try {
     const content = params.content;
     const operation = params.operation || 'analyze';
@@ -325,7 +341,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-09-04",
     updatedAt: "2023-09-18"
   },
@@ -335,30 +352,32 @@ export const mockTools: Tool[] = [
     name: "API请求工具",
     description: "发送API请求并格式化结果",
     iconId: 31, // 使用LanguageOutline图标
-    param: [
-      {
-        name: "endpoint",
-        type: "string",
-        description: "API终端点",
-        required: true,
-        testValue: "https://jsonplaceholder.typicode.com/posts/1"
-      },
-      {
-        name: "method",
-        type: "string",
-        description: "请求方法",
-        required: false,
-        testValue: "GET"
-      },
-      {
-        name: "format",
-        type: "string",
-        description: "响应格式(json, text, xml)",
-        required: false,
-        testValue: "json"
-      }
-    ],
-    code: `async function makeAPIRequest(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "endpoint",
+          type: "string",
+          description: "API终端点",
+          required: true,
+          testValue: "https://jsonplaceholder.typicode.com/posts/1"
+        },
+        {
+          name: "method",
+          type: "string",
+          description: "请求方法",
+          required: false,
+          testValue: "GET"
+        },
+        {
+          name: "format",
+          type: "string",
+          description: "响应格式(json, text, xml)",
+          required: false,
+          testValue: "json"
+        }
+      ],
+      code: `async function makeAPIRequest(params) {
   try {
     const endpoint = params.endpoint;
     const method = params.method || 'GET';
@@ -398,7 +417,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-09-05",
     updatedAt: "2023-09-19"
   },
@@ -408,23 +428,25 @@ export const mockTools: Tool[] = [
     name: "Git操作工具",
     description: "执行Git命令并展示结果",
     iconId: 6, // 使用RocketOutline图标
-    param: [
-      {
-        name: "command",
-        type: "string",
-        description: "Git命令(不包含'git'前缀)",
-        required: true,
-        testValue: "status"
-      },
-      {
-        name: "repoPath",
-        type: "string",
-        description: "代码仓库路径",
-        required: false,
-        testValue: "./my-project"
-      }
-    ],
-    code: `async function executeGitCommand(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "command",
+          type: "string",
+          description: "Git命令(不包含'git'前缀)",
+          required: true,
+          testValue: "status"
+        },
+        {
+          name: "repoPath",
+          type: "string",
+          description: "代码仓库路径",
+          required: false,
+          testValue: "./my-project"
+        }
+      ],
+      code: `async function executeGitCommand(params) {
   try {
     // 注意：这在实际浏览器环境中不会工作，因为没有直接访问文件系统的权限
     // 此代码仅作为模拟示例
@@ -448,7 +470,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-10-01",
     updatedAt: "2023-10-15"
   },
@@ -458,30 +481,32 @@ export const mockTools: Tool[] = [
     name: "数学工具",
     description: "执行复杂的数学计算和公式求解",
     iconId: 33, // 使用MedalOutline图标
-    param: [
-      {
-        name: "expression",
-        type: "string",
-        description: "数学表达式",
-        required: true,
-        testValue: "2 * (3 + 4)"
-      },
-      {
-        name: "variables",
-        type: "object",
-        description: "表达式中使用的变量",
-        required: false,
-        testValue: '{"x": 5, "y": 3}'
-      },
-      {
-        name: "operation",
-        type: "string",
-        description: "操作类型: evaluate, simplify, solve",
-        required: false,
-        testValue: "evaluate"
-      }
-    ],
-    code: `async function mathCalculator(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "expression",
+          type: "string",
+          description: "数学表达式",
+          required: true,
+          testValue: "2 * (3 + 4)"
+        },
+        {
+          name: "variables",
+          type: "object",
+          description: "表达式中使用的变量",
+          required: false,
+          testValue: '{"x": 5, "y": 3}'
+        },
+        {
+          name: "operation",
+          type: "string",
+          description: "操作类型: evaluate, simplify, solve",
+          required: false,
+          testValue: "evaluate"
+        }
+      ],
+      code: `async function mathCalculator(params) {
   try {
     const expression = params.expression;
     const operation = params.operation || 'evaluate';
@@ -550,7 +575,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-10-02",
     updatedAt: "2023-10-16"
   },
@@ -560,30 +586,32 @@ export const mockTools: Tool[] = [
     name: "数据分析工具",
     description: "分析数值数据并生成统计信息",
     iconId: 2, // 使用HeartOutline图标
-    param: [
-      {
-        name: "data",
-        type: "string",
-        description: "数值数据，以逗号分隔",
-        required: true,
-        testValue: "5,12,23,17,9,14,6,8,20,15"
-      },
-      {
-        name: "operations",
-        type: "string",
-        description: "统计操作：basic, full, correlation",
-        required: false,
-        testValue: "basic"
-      },
-      {
-        name: "secondData",
-        type: "string",
-        description: "用于相关性分析的第二组数据",
-        required: false,
-        testValue: "8,15,20,12,7,10,5,9,18,14"
-      }
-    ],
-    code: `async function analyzeData(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "data",
+          type: "string",
+          description: "数值数据，以逗号分隔",
+          required: true,
+          testValue: "5,12,23,17,9,14,6,8,20,15"
+        },
+        {
+          name: "operations",
+          type: "string",
+          description: "统计操作：basic, full, correlation",
+          required: false,
+          testValue: "basic"
+        },
+        {
+          name: "secondData",
+          type: "string",
+          description: "用于相关性分析的第二组数据",
+          required: false,
+          testValue: "8,15,20,12,7,10,5,9,18,14"
+        }
+      ],
+      code: `async function analyzeData(params) {
   try {
     // 解析数据
     const dataStr = params.data;
@@ -718,7 +746,8 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-10-03",
     updatedAt: "2023-10-17"
   },
@@ -728,30 +757,32 @@ export const mockTools: Tool[] = [
     name: "数据可视化工具",
     description: "生成数据可视化描述，可用于图表生成",
     iconId: 16, // 使用ColorPaletteOutline图标
-    param: [
-      {
-        name: "data",
-        type: "string",
-        description: "要可视化的数据，JSON格式",
-        required: true,
-        testValue: '[{"month":"一月","sales":120},{"month":"二月","sales":140},{"month":"三月","sales":180}]'
-      },
-      {
-        name: "chartType",
-        type: "string",
-        description: "图表类型: bar, line, pie, scatter",
-        required: true,
-        testValue: "line"
-      },
-      {
-        name: "title",
-        type: "string",
-        description: "图表标题",
-        required: false,
-        testValue: "月度销售额"
-      }
-    ],
-    code: `async function visualizeData(params) {
+    type: "js",
+    data: {
+      param: [
+        {
+          name: "data",
+          type: "string",
+          description: "要可视化的数据，JSON格式",
+          required: true,
+          testValue: '[{"month":"一月","sales":120},{"month":"二月","sales":140},{"month":"三月","sales":180}]'
+        },
+        {
+          name: "chartType",
+          type: "string",
+          description: "图表类型: bar, line, pie, scatter",
+          required: true,
+          testValue: "line"
+        },
+        {
+          name: "title",
+          type: "string",
+          description: "图表标题",
+          required: false,
+          testValue: "月度销售额"
+        }
+      ],
+      code: `async function visualizeData(params) {
   try {
     const chartType = params.chartType || 'bar';
     const title = params.title || 'Data Visualization';
@@ -861,8 +892,36 @@ export const mockTools: Tool[] = [
       error: error.message
     };
   }
-}`,
+}`
+    },
     createdAt: "2023-10-04",
     updatedAt: "2023-10-18"
+  },
+  // MCP IO和SSE工具示例
+  {
+    id: 10,
+    categoryId: 3,
+    name: "本地命令执行工具",
+    description: "执行本地命令并返回结果（仅示例）",
+    iconId: 36, // 使用适当的图标
+    type: "mcp-io",
+    data: {
+      path: "/usr/local/bin/command-executor"
+    },
+    createdAt: "2023-11-01",
+    updatedAt: "2023-11-15"
+  },
+  {
+    id: 11,
+    categoryId: 1,
+    name: "事件流监听工具",
+    description: "监听服务器事件流（仅示例）",
+    iconId: 42, // 使用适当的图标
+    type: "mcp-sse",
+    data: {
+      url: "https://api.example.com/events"
+    },
+    createdAt: "2023-11-02", 
+    updatedAt: "2023-11-16"
   }
 ];

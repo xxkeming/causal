@@ -106,6 +106,75 @@ fn ftech(
             store.delete_agent_category(id)?;
             Ok(serde_json::json!({ "status": "success" }))
         }
+        "tool.add" => {
+            let tool: store::Tool = serde_json::from_str(data)?;
+            store.add_tool(tool)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "tool.update" => {
+            let tool: store::Tool = serde_json::from_str(data)?;
+            store.update_tool(tool)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "tool.delete" => {
+            let id: u64 = serde_json::from_str(data)?;
+            store.delete_tool(id)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "tool.delete.by.category" => {
+            let id: u64 = serde_json::from_str(data)?;
+            store.delete_tool_by_category(id)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "tool.get" => {
+            let id: u64 = serde_json::from_str(data)?;
+            let tool = store.get_tool(id)?;
+            match tool {
+                Some(tool) => {
+                    let parsed_data: serde_json::Value = serde_json::to_value(tool)?;
+                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
+                }
+                None => Ok(serde_json::json!({ "status": "error", "error": "Tool not found" })),
+            }
+        }
+        "tool.list" => {
+            let list = store.get_all_tools()?;
+            let parsed_data: serde_json::Value = serde_json::to_value(list)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
+        }
+        "tool.category.list" => {
+            let list = store.get_all_tool_categories()?;
+            let parsed_data: serde_json::Value = serde_json::to_value(list)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
+        }
+        "tool.category.get" => {
+            let id: u64 = serde_json::from_str(data)?;
+            let category = store.get_tool_category(id)?;
+            match category {
+                Some(category) => {
+                    let parsed_data: serde_json::Value = serde_json::to_value(category)?;
+                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
+                }
+                None => {
+                    Ok(serde_json::json!({ "status": "error", "error": "Tool category not found" }))
+                }
+            }
+        }
+        "tool.category.add" => {
+            let category: store::ToolCategory = serde_json::from_str(data)?;
+            store.add_tool_category(category)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "tool.category.update" => {
+            let category: store::ToolCategory = serde_json::from_str(data)?;
+            store.update_tool_category(category)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "tool.category.delete" => {
+            let id: u64 = serde_json::from_str(data)?;
+            store.delete_tool_category(id)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
         _ => Err(error::Error::Unknown),
     }
 }

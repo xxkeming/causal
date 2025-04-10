@@ -1,6 +1,4 @@
 import { Agent, AgentCategory, Tool, ToolCategory } from './typings';
-import { mockAgents, mockCategories } from './mock/agentData';
-import { mockTools, mockToolCategories } from './mock/toolData';
 import { mockKnowledgeBases } from './mock/knowledgeData';
 import { KnowledgeBase, KnowledgeBaseCategory } from './typings';
 import { Provider } from './typings';
@@ -75,116 +73,78 @@ export async function deleteAgentByCategory(categoryId: number): Promise<boolean
 // 工具相关API接口
 // 获取所有工具类别
 export async function getToolCategories(): Promise<ToolCategory[]> {
-  return new Promise((resolve) => {
-    resolve(structuredClone(mockToolCategories));
-  });
-}
-
-// 根据分类获取工具
-export async function getToolsByCategory(categoryId: number): Promise<Tool[]> {
-  return new Promise((resolve) => {
-    const filteredTools = mockTools.filter(tool => tool.categoryId === categoryId);
-    resolve(filteredTools);
-  });
+  return tauriApi.fetch_local('tool.category.list', null) as Promise<ToolCategory[]>;
 }
 
 // 获取所有工具
 export async function getAllTools(): Promise<Tool[]> {
-  return new Promise((resolve) => {
-    resolve(mockTools);
-  });
+  return tauriApi.fetch_local('tool.list', null) as Promise<Tool[]>;
 }
 
 // 通过ID获取特定工具
 export async function getToolById(id: number): Promise<Tool | null> {
-  return new Promise((resolve) => {
-    const tool = mockTools.find(tool => tool.id === id);
-    resolve(tool || null);
-  });
+  return tauriApi.fetch_local('tool.get', id) as Promise<Tool | null>;
 }
 
 // 添加工具类别
-export async function addToolCategory(category: Pick<ToolCategory, 'name'>): Promise<ToolCategory> {
-  return new Promise((resolve) => {
-    // 确保ID是唯一的，使用毫秒时间戳 + 随机数确保唯一性
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    const newId = timestamp * 1000 + random;
-    
-    // 先检查是否已存在同名类别
-    const existingCategory = mockToolCategories.find(cat => cat.name === category.name);
-    if (existingCategory) {
-      // 如果存在同名类别，直接返回现有类别
-      resolve(existingCategory);
-      return;
-    }
-    
-    // 如果不存在同名类别，创建新类别
-    const newCategory: ToolCategory = {
-      id: newId,
-      name: category.name
-    };
-    
-    // 添加到模拟数据中
-    mockToolCategories.push(newCategory);
-    resolve(newCategory);
-  });
+export async function addToolCategory(category: Pick<ToolCategory, 'name'>): Promise<boolean> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
+  
+  const newCategory: ToolCategory = {
+    id: newId,
+    name: category.name,
+    createdAt: timestamp
+  };
+  
+  return tauriApi.fetch_local('tool.category.add', newCategory) as Promise<boolean>;
 }
 
 // 删除工具类别
 export async function deleteToolCategory(categoryId: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const index = mockToolCategories.findIndex(cat => cat.id === categoryId);
-    if (index !== -1) {
-      mockToolCategories.splice(index, 1);
-      resolve(true);
-    } else {
-      resolve(false);
-    }
-  });
+  return tauriApi.fetch_local('tool.category.delete', categoryId) as Promise<boolean>;
 }
 
 // 添加工具
-export async function addTool(tool: Omit<Tool, 'id' | 'createdAt' | 'updatedAt'>): Promise<Tool> {
-  return new Promise((resolve) => {
-    const newTool: Tool = {
-      ...tool,
-      id: mockTools.length + 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    mockTools.push(newTool);
-    resolve(newTool);
-  });
+export async function addTool(tool: Omit<Tool, 'id' | 'createdAt' | 'updatedAt'>): Promise<boolean> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
+  
+  const newTool: Tool = {
+    ...tool,
+    id: newId,
+    createdAt: timestamp
+  };
+  
+  return tauriApi.fetch_local('tool.add', newTool) as Promise<boolean>;
 }
 
 // 更新工具
-export async function updateTool(tool: Tool): Promise<Tool> {
-  return new Promise((resolve, reject) => {
-    const index = mockTools.findIndex(t => t.id === tool.id);
-    if (index !== -1) {
-      mockTools[index] = {
-        ...tool,
-        updatedAt: new Date().toISOString()
-      };
-      resolve(mockTools[index]);
-    } else {
-      reject(new Error('Tool not found'));
-    }
-  });
+export async function updateTool(tool: Tool): Promise<boolean> {
+  const timestamp = Date.now();
+  const updatedTool = {
+    ...tool,
+    updatedAt: timestamp
+  };
+  
+  return tauriApi.fetch_local('tool.update', updatedTool) as Promise<boolean>;
 }
 
 // 删除工具
 export async function deleteTool(id: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const index = mockTools.findIndex(tool => tool.id === id);
-    if (index !== -1) {
-      mockTools.splice(index, 1);
-      resolve(true);
-    } else {
-      resolve(false);
-    }
-  });
+  return tauriApi.fetch_local('tool.delete', id) as Promise<boolean>;
+}
+
+// 根据类别删除工具
+export async function deleteToolByCategory(categoryId: number): Promise<boolean> {
+  return tauriApi.fetch_local('tool.delete.by.category', categoryId) as Promise<boolean>;
+}
+
+// 测试工具
+export async function testTool(tool: Tool): Promise<string> {
+  return tauriApi.fetch_local('tool.test', tool) as Promise<string>;
 }
 
 // 模拟固定的知识库类别

@@ -345,6 +345,7 @@ const apiCategoryOptions = ProviderApiCategory.map(category => ({
 // 模型标签选项
 const modelTagOptions = [
   { label: '推理', value: '推理' },
+  { label: '工具', value: '工具' },
   { label: '向量', value: '向量' },
   { label: '图片', value: '图片' }
 ];

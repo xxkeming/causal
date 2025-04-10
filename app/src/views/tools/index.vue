@@ -87,6 +87,13 @@
             <n-grid :cols="4" :x-gap="16" :y-gap="16" responsive="screen">
               <n-grid-item v-for="tool in filteredTools" :key="tool.id">
                 <n-card hoverable class="tool-card" :bordered="false">
+                  <!-- 添加工具类型标签 -->
+                  <div class="tool-type-tag">
+                    <n-tag size="small" :type="getTypeTagColor(tool.type)">
+                      {{ getTypeDisplay(tool.type) }}
+                    </n-tag>
+                  </div>
+                  
                   <template #header>
                     <div class="tool-card-header">
                       <n-avatar round :size="32" :color="getToolIcon(tool)?.color || '#d9d9d9'">
@@ -190,12 +197,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router'
 import { 
   NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
   NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
-  NEmpty, NSpace, NSpin, NModal
+  NEmpty, NSpace, NSpin, NModal, NTag
 } from 'naive-ui';
 import { 
   AddOutline, SearchOutline, BuildOutline, CreateOutline, 
@@ -287,6 +294,9 @@ async function deleteCategory() {
   try {
     const success = await categoryStore.removeCategory(categoryToDelete.value.id);
     if (success) {
+      await toolStore.removeToolByCategory(categoryToDelete.value.id);
+
+      // 如果当前选中的是被删除的类别，则切换到"所有智能体"
       if (selectedCategory.value === categoryToDelete.value.id) {
         selectedCategory.value = 'all';
       }
@@ -374,14 +384,33 @@ function getToolIcon(tool: Tool) {
   return null;
 }
 
-// 监听需要刷新状态，如果需要则重新加载数据
-watch(() => toolStore.needRefresh, (needRefresh) => {
-  if (needRefresh) {
-    console.log("需要刷新工具列表，正在重新加载...");
-    // 简化为只调用 fetchAllTools
-    toolStore.fetchAllTools();
+// 获取工具类型显示文本
+function getTypeDisplay(type: string): string {
+  switch(type) {
+    case 'js':
+      return 'JavsScript';
+    case 'mcp-io':
+      return 'MCP-IO';
+    case 'mcp-sse':
+      return 'MCP-SSE';
+    default:
+      return type.toUpperCase();
   }
-}, { immediate: true }); 
+}
+
+// 获取工具类型标签颜色
+function getTypeTagColor(type: string): "error" | "info" | "success" | "warning" | "default" | "primary" {
+  switch(type) {
+    case 'js':
+      return 'success';
+    case 'mcp-io':
+      return 'info';
+    case 'mcp-sse':
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
 
 // 在组件挂载时加载数据
 onMounted(async () => {
@@ -472,11 +501,20 @@ onMounted(async () => {
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   min-height: 200px;
+  position: relative; /* 添加相对定位用于标签定位 */
 }
 
 .tool-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 工具类型标签样式 */
+.tool-type-tag {
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  z-index: 1;
 }
 
 .tool-card-header {
