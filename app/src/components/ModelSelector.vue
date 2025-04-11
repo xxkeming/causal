@@ -108,7 +108,7 @@ const providerOptions = computed<CascaderOption[]>(() => {
       disabled: !provider.models || filteredModels.length === 0,
       children: filteredModels.map(model => ({
         label: model.name,
-        value: provider.id + ':' + model.name,
+        value: provider.id + '|' + model.name,
         isLeaf: true,
         // 添加额外信息用于UI展示
         tags: model.tags || [],
@@ -149,7 +149,7 @@ const handleChange = (value: string | null) => {
 
   // 解析value格式为 providerId:modelName
   if (typeof value === 'string') {
-    const [providerId, modelName] = value.split(':');
+    const [providerId, modelName] = value.split('|');
     // selectedModel.value = [parseInt(providerId, 10), modelName];
 
     // 获取provider对象

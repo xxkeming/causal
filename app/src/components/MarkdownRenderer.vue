@@ -115,6 +115,54 @@ async function renderMermaidDiagrams(html: string): Promise<string> {
   return html;
 }
 
+// 处理 <think> 标签，将其转换为可折叠区域
+function processThinkTags(html: string): string {
+  // 流式传输中可能会有不完整的标签对
+  // 使用更宽松的正则表达式匹配已经开始的思考过程
+  let processedHtml = html;
+  
+  // 1. 处理完整的标签对
+  processedHtml = processedHtml.replace(/<think>([\s\S]*?)<\/think>/g, (_match, content) => {
+    // 检查内容是否只包含空白字符
+    if (!content || /^\s*$/.test(content)) {
+      return '';
+    }
+    
+    return `
+      <div class="thinking-block">
+        <details>
+          <summary class="thinking-summary">思考过程</summary>
+          <div class="thinking-content">${content}</div>
+        </details>
+      </div>
+    `;
+  });
+  
+  // 2. 处理只有开始标签的情况 (流式传输中的情况)
+  const thinkStartTagPattern = /<think>([\s\S]*)$/;
+  const startMatch = processedHtml.match(thinkStartTagPattern);
+  
+  if (startMatch) {
+    // 找到了开始标签但没有结束标签
+    const partialContent = startMatch[1];
+    
+    // 只有非空内容才显示
+    if (partialContent && !/^\s*$/.test(partialContent)) {
+      // 替换开始标签和后面的内容为思考块
+      processedHtml = processedHtml.replace(thinkStartTagPattern, `
+        <div class="thinking-block">
+          <details open>
+            <summary class="thinking-summary">思考过程</summary>
+            <div class="thinking-content thinking-ongoing">${partialContent}</div>
+          </details>
+        </div>
+      `);
+    }
+  }
+  
+  return processedHtml;
+}
+
 // 渲染Markdown内容
 async function renderMarkdown(content: string): Promise<string> {
   if (!content) return '';
@@ -131,6 +179,9 @@ async function renderMarkdown(content: string): Promise<string> {
     
     // 处理 Mermaid 图表
     html = await renderMermaidDiagrams(html);
+    
+    // 处理思考过程标签
+    html = processThinkTags(html);
     
     return html;
   } catch (error) {
@@ -301,6 +352,49 @@ onMounted(() => {
   background-color: rgba(208, 48, 80, 0.1);
 }
 
+/* 增强表格样式 */
+.markdown-body :deep(.table-container) {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 12px;
+  border: 1px solid #dfe2e5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.markdown-body :deep(table th) {
+  background-color: #f1f3f4;
+  font-weight: 600;
+  text-align: left;
+  color: #24292e;
+  padding: 8px 13px;
+  border: 1px solid #dfe2e5;
+}
+
+.markdown-body :deep(table td) {
+  padding: 6px 13px;
+  border: 1px solid #dfe2e5;
+}
+
+.markdown-body :deep(table tr) {
+  background-color: #fff;
+  border-top: 1px solid #c6cbd1;
+  transition: background-color 0.2s ease;
+}
+
+.markdown-body :deep(table tr:nth-child(2n)) {
+  background-color: #f6f8fa;
+}
+
+.markdown-body :deep(table tr:hover) {
+  background-color: rgba(0, 120, 215, 0.05);
+}
+
 .markdown-body :deep(.code-block) {
   position: relative;
   margin-bottom: 12px; /* 从16px减小 */
@@ -430,5 +524,65 @@ onMounted(() => {
 .markdown-body :deep(sub),
 .markdown-body :deep(sup) {
   font-size: 0.8em;
+}
+
+/* 思考过程折叠区域样式 */
+.markdown-body :deep(.thinking-block) {
+  margin: 8px 0;
+  border-radius: 2px;
+  border-left: 1px solid #6b7280;
+  background-color: #f9fafb;
+}
+
+.markdown-body :deep(.thinking-summary) {
+  padding: 4px 6px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+
+.markdown-body :deep(.thinking-summary::before) {
+  font-size: 0.8em;
+  margin-right: 8px;
+  transition: transform 0.2s;
+}
+
+.markdown-body :deep(details[open] .thinking-summary::before) {
+  transform: rotate(90deg);
+}
+
+.markdown-body :deep(.thinking-content) {
+  padding: 6px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.95em;
+  color: #4b5563;
+  /* background-color: #f3f4f6; */
+}
+
+/* 正在进行中的思考过程样式 */
+.markdown-body :deep(.thinking-ongoing) {
+  border-left: 2px solid #6366f1;
+  position: relative;
+}
+
+.markdown-body :deep(.thinking-ongoing::after) {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: #6366f1;
+  border-radius: 50%;
+  margin-left: 6px;
+  animation: thinking-pulse 1.5s infinite;
+  vertical-align: middle;
+}
+
+@keyframes thinking-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
 }
 </style>

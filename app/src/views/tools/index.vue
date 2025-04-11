@@ -15,8 +15,8 @@
             <!-- 所有工具选项 -->
             <n-list-item 
               class="category-item"
-              :class="{ active: selectedCategory === 'all' }"
-              @click="handleSelectCategory('all')"
+              :class="{ active: selectedCategory === 0 }"
+              @click="handleSelectCategory(0)"
             >
               <div class="category-content">
                 所有工具
@@ -32,20 +32,39 @@
               @click="handleSelectCategory(category.id)"
             >
               <div class="category-content category-item-wrapper">
-                <span class="category-name">
-                  {{ category.name }}
-                </span>
-                <n-button 
-                  circle 
-                  size="tiny" 
-                  quaternary 
-                  class="category-delete-btn"
-                  @click.stop="confirmDeleteCategory(category)"
-                >
-                  <template #icon>
-                    <n-icon size="14"><CloseOutline /></n-icon>
+                <n-tooltip placement="right" trigger="hover">
+                  <template #trigger>
+                    <span class="category-name">
+                      {{ category.name }}
+                    </span>
                   </template>
-                </n-button>
+                  {{ category.name }}
+                </n-tooltip>
+                <div class="category-actions">
+                  <!-- 添加编辑按钮 -->
+                  <n-button 
+                    circle 
+                    size="tiny" 
+                    quaternary 
+                    class="category-action-btn"
+                    @click.stop="openEditCategory(category)"
+                  >
+                    <template #icon>
+                      <n-icon size="14"><CreateOutline /></n-icon>
+                    </template>
+                  </n-button>
+                  <n-button 
+                    circle 
+                    size="tiny" 
+                    quaternary 
+                    class="category-action-btn"
+                    @click.stop="confirmDeleteCategory(category)"
+                  >
+                    <template #icon>
+                      <n-icon size="14"><CloseOutline /></n-icon>
+                    </template>
+                  </n-button>
+                </div>
               </div>
             </n-list-item>
             
@@ -147,10 +166,12 @@
       </n-layout>
     </n-layout>
     
-    <!-- 添加分类对话框 -->
+    <!-- 添加/编辑类别对话框 -->
     <tool-category-add-modal
       v-model:visible="showAddCategoryModal"
+      :category="categoryToEditForModal"
       @submit="addNewCategory"
+      @update="updateCategory"
     />
     
     <!-- 删除分类确认对话框 -->
@@ -197,12 +218,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router'
 import { 
   NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
   NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
-  NEmpty, NSpace, NSpin, NModal, NTag
+  NEmpty, NSpace, NSpin, NModal, NTag, NTooltip
 } from 'naive-ui';
 import { 
   AddOutline, SearchOutline, BuildOutline, CreateOutline, 
@@ -229,7 +250,7 @@ const iconStore = useIconStore();
 
 // 本地状态
 const searchKeyword = ref<string>('');
-const selectedCategory = ref<string | number>('all');
+const selectedCategory = ref<number>(0);
 const showAddCategoryModal = ref<boolean>(false);
 const showDeleteCategoryModal = ref<boolean>(false);
 const showDeleteToolModal = ref<boolean>(false);
@@ -238,13 +259,17 @@ const isEditingTool = ref<boolean>(false);
 const categoryToDelete = ref<ToolCategory | null>(null);
 const toolToDelete = ref<Tool | null>(null);
 const submittingTool = ref<boolean>(false);
+const categoryToEdit = ref<ToolCategory | null>(null); // 添加分类编辑相关状态
+
+// Computed property to handle null-to-undefined conversion
+const categoryToEditForModal = computed(() => categoryToEdit.value || undefined);
 
 // 计算属性 - 同时处理分类筛选和关键词搜索
 const filteredTools = computed(() => {
   let result = toolStore.tools;
   
   // 先按分类筛选
-  if (selectedCategory.value !== 'all') {
+  if (selectedCategory.value !== 0) {
     result = result.filter(tool => tool.categoryId === selectedCategory.value);
   }
   
@@ -265,13 +290,12 @@ const emptyDescription = computed(() => {
   if (searchKeyword.value) {
     return '没有找到匹配的工具';
   }
-  return selectedCategory.value === 'all' ? '暂无工具' : '该分类下暂无工具';
+  return selectedCategory.value === 0 ? '暂无工具' : '该分类下暂无工具';
 });
 
 // 处理分类选择 - 简化为仅更新本地状态
-function handleSelectCategory(categoryId: number | 'all') {
+function handleSelectCategory(categoryId: number) {
   selectedCategory.value = categoryId;
-  // 不再调用 fetchToolsByCategory，所有筛选在客户端进行
 }
 
 // 格式化日期
@@ -298,7 +322,7 @@ async function deleteCategory() {
 
       // 如果当前选中的是被删除的类别，则切换到"所有智能体"
       if (selectedCategory.value === categoryToDelete.value.id) {
-        selectedCategory.value = 'all';
+        selectedCategory.value = 0;
       }
       message.success('类别已删除');
     } else {
@@ -342,7 +366,7 @@ async function addNewCategory(name: string) {
 
 // 显示工具表单模态框
 function showToolFormModal() {
-  const query = selectedCategory.value !== 'all' ? { categoryId: selectedCategory.value } : {};
+  const query = selectedCategory.value !== 0 ? { categoryId: selectedCategory.value } : {};
   router.push({ path: '/tools/edit', query });
 }
 
@@ -412,6 +436,41 @@ function getTypeTagColor(type: string): "error" | "info" | "success" | "warning"
   }
 }
 
+// 打开编辑分类对话框
+function openEditCategory(category: ToolCategory) {
+  categoryToEdit.value = category;
+  showAddCategoryModal.value = true;
+}
+
+// 编辑分类
+async function updateCategory(category: ToolCategory) {
+  try {
+    // 检查类别名称是否存在
+    const duplicatedCategory = categoryStore.categories.find(
+      c => c.name.toLowerCase() === category.name.toLowerCase() && 
+           c.id !== category.id
+    );
+    
+    if (duplicatedCategory) {
+      message.warning('分类名称已存在');
+      return; // 不关闭对话框
+    }
+    
+    const success = await categoryStore.updateCategory(category);
+    
+    if (success) {
+      message.success('分类已更新');
+      showAddCategoryModal.value = false;
+      categoryToEdit.value = null;
+    } else {
+      message.error('更新分类失败');
+    }
+  } catch (error) {
+    console.error('更新分类时出错:', error);
+    message.error('更新分类时发生错误');
+  }
+}
+
 // 在组件挂载时加载数据
 onMounted(async () => {
   console.log('Tools view mounted');
@@ -419,6 +478,12 @@ onMounted(async () => {
   
   // 只获取所有工具数据，不再按分类获取
   await toolStore.fetchAllTools();
+});
+
+// 组件卸载时清理状态
+onBeforeUnmount(() => {
+  categoryToEdit.value = null;
+  categoryToDelete.value = null;
 });
 </script>
 
@@ -584,9 +649,10 @@ onMounted(async () => {
 
 .category-item-wrapper {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   width: 100%;
+  position: relative;
+  min-height: 24px; /* 确保有足够的高度容纳按钮 */
 }
 
 .category-name {
@@ -594,18 +660,53 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 60px;
+  max-width: 75px; /* 增加最大宽度，但保留空间给按钮 */
   cursor: pointer;
 }
 
-.category-delete-btn {
-  flex-shrink: 0;
-  margin-left: 4px;
+/* 分类操作按钮容器 - 改为绝对定位，使其悬浮，添加透明效果 */
+.category-actions {
+  position: absolute;
+  right: 0px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
   visibility: hidden;
+  background-color: transparent; /* 透明背景 */
+  border-radius: 4px;
+  z-index: 2;
+  padding: 0 6px;
+  transition: all 0.2s ease;
 }
 
-.category-item:hover .category-delete-btn {
+/* 确保在暗黑模式下也有正确的背景色 */
+html.dark .category-actions {
+  background-color: transparent; /* 透明背景 */
+}
+
+.category-item:hover .category-actions {
   visibility: visible;
+}
+
+.category-action-btn {
+  opacity: 0.6;
+  transition: all 0.2s;
+  margin: 0 1px; /* 减小按钮间距 */
+  padding: 0; /* 移除内边距 */
+  width: 18px; /* 固定按钮宽度 */
+  height: 18px; /* 固定按钮高度 */
+  min-width: unset; /* 移除最小宽度限制 */
+  background-color: transparent; /* 按钮透明背景 */
+}
+
+.category-action-btn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1); /* 悬停时轻微背景 */
+}
+
+/* 暗色模式悬停效果 */
+html.dark .category-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1); /* 暗模式下悬停背景 */
 }
 
 .add-category {

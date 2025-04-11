@@ -9,6 +9,9 @@ pub enum Error {
     #[error("Invalid data: {0}")]
     InvalidData(String),
 
+    #[error("OpenAI error: {0}")]
+    OpenAI(#[from] async_openai::error::OpenAIError),
+
     #[error("Unknown data")]
     Unknown,
 }

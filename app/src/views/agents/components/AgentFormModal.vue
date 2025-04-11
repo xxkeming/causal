@@ -505,7 +505,7 @@ const handleModelChange = (modelInfo: { providerId: number, modelName: string } 
   if (modelInfo) {
     console.log('接收到模型选择变更:', modelInfo);
     
-    selectedModelValue.value = modelInfo.providerId + ':' + modelInfo.modelName;
+    selectedModelValue.value = modelInfo.providerId + '|' + modelInfo.modelName;
     
     // 确保 providerId 是数字类型
     const providerId = typeof modelInfo.providerId === 'string' 
@@ -724,7 +724,7 @@ watch(() => props.visible, (visible) => {
     })) : [];
     
     if (props.agentData.model && props.agentData.model.id !== undefined && props.agentData.model.name) {
-      selectedModelValue.value = props.agentData.model.id + ':' + props.agentData.model.name;
+      selectedModelValue.value = props.agentData.model.id + '|' + props.agentData.model.name;
     }
   } else if (!props.isEdit) {
     // 非编辑模式打开时，如果有默认分类ID且不是'all'，则设置为默认分类

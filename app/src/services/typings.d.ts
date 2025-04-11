@@ -197,13 +197,17 @@ export interface KnowledgeBaseDocument {
 
 // 聊天信息
 export interface ChatMessage {
+  // 消息ID
+  id: number;
+  
   // 会话ID
   sessionId: number;
 
   role: 'user' | 'assistant' | 'system';
   content: string;
   status: string;
-  timestamp?: Date;
+  createdAt: number;
+  updatedAt?: number;
 }
 
 // 聊天会话信息
@@ -217,8 +221,8 @@ export interface ChatSession {
   // 会话主题
   topic: string;
 
-  createdAt: string;
-  updatedAt?: string;
+  createdAt: number;
+  updatedAt?: number;
 }
 
 // API 响应格式

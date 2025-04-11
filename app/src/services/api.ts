@@ -1,6 +1,7 @@
 import { Agent, AgentCategory, Tool, ToolCategory } from './typings';
 import { mockKnowledgeBases } from './mock/knowledgeData';
 import { KnowledgeBase, KnowledgeBaseCategory } from './typings';
+import { ChatSession, ChatMessage } from './typings';
 import { Provider } from './typings';
 
 // 导入Tauri API
@@ -24,6 +25,17 @@ export async function addAgentCategory(category: Pick<AgentCategory, 'name'>): P
   };
 
   return tauriApi.fetch_local('agent.category.add', newCategory) as Promise<boolean>;
+}
+
+// 更新智能体类别 - 添加此函数
+export async function updateAgentCategory(category: AgentCategory): Promise<boolean> {
+  // 确保更新时间已更新
+  const updatedCategory = {
+    ...category,
+    // 不更新创建时间，只使用传入的值
+  };
+
+  return tauriApi.fetch_local('agent.category.update', updatedCategory) as Promise<boolean>;
 }
 
 // 删除智能体类别
@@ -99,6 +111,15 @@ export async function addToolCategory(category: Pick<ToolCategory, 'name'>): Pro
   };
   
   return tauriApi.fetch_local('tool.category.add', newCategory) as Promise<boolean>;
+}
+
+// 更新工具类别
+export async function updateToolCategory(category: ToolCategory): Promise<boolean> {
+  const updatedCategory = {
+    ...category,
+  };
+  
+  return tauriApi.fetch_local('tool.category.update', updatedCategory) as Promise<boolean>;
 }
 
 // 删除工具类别
@@ -270,25 +291,78 @@ export async function deleteProvider(id: number): Promise<boolean> {
   return tauriApi.fetch_local('provider.delete', id) as Promise<boolean>;
 }
 
-// 模拟流式输出的聊天接口（逐字输出，间隔10毫秒）
-export function simulateChatStream(input: string, onData: (chunk: string) => void, delay = 100): Promise<void> {
-  const response = `作为AI助手，我收到了您的消息："${input}"。让我来为您解答。这是一个模拟的流式输出示例。希望这个回答对您有帮助！`;
+// 添加会话session
+export async function addSession(sessionData: Omit<ChatSession, 'id' | 'createdAt'>): Promise<ChatSession> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
 
-  // 延迟2秒后开始输出
-  return new Promise(async (resolve) => {
-    setTimeout(() => {
-      for (const char of response) {
-        // 模拟逐字延迟
-        setTimeout(() => {
-          onData(char);
-        }, delay);
-        delay += 10; // 每个字符延迟10毫秒
-      }
-      resolve();
-    }, 2000); // 延迟2秒后开始输出
-  });
+  const newSession: ChatSession = {
+    id: newId,
+    createdAt: timestamp,
+    ...sessionData
+  };
+  
+  return tauriApi.fetch_local('chat.session.add', newSession) as Promise<ChatSession>;
+}
+
+// 更新会话session
+export async function updateSession(sessionData: ChatSession): Promise<boolean> {
+  return tauriApi.fetch_local('chat.session.update', sessionData) as Promise<boolean>;
+}
+
+// 删除会话session
+export async function deleteSession(id: number): Promise<boolean> {
+  return tauriApi.fetch_local('chat.session.delete', id) as Promise<boolean>;
+}
+
+// 获取所有会话session
+export async function getAllSessions(): Promise<ChatSession[]> {
+  return tauriApi.fetch_local('chat.session.list', null) as Promise<ChatSession[]>;
+}
+
+// 添加聊天消息
+export async function addMessage(messageData: Omit<ChatMessage, 'id' | 'createdAt'>): Promise<ChatMessage> {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const newId = timestamp * 1000 + random;
+
+  const newMessage: ChatMessage = {
+    id: newId,
+    createdAt: timestamp,
+    ...messageData
+  };
+  
+  return tauriApi.fetch_local('chat.message.add', newMessage) as Promise<ChatMessage>;
+}
+
+// 更新聊天消息
+export async function updateMessage(messageData: Omit<ChatMessage, ''>): Promise<boolean> {
+  return tauriApi.fetch_local('chat.message.update', messageData) as Promise<boolean>;
+}
+
+// 删除聊天消息
+export async function deleteMessage(id: number): Promise<boolean> {
+  return tauriApi.fetch_local('chat.message.delete', id) as Promise<boolean>;
+}
+
+// 通过会话id获取聊天消息
+export async function getMessagesBySession(sessionId: number): Promise<ChatMessage[]> {
+  return tauriApi.fetch_local('chat.message.list.by.session', sessionId) as Promise<ChatMessage[]>;
+}
+
+// 通过会话id删除聊天消息
+export async function deleteMessagesBySession(sessionId: number): Promise<boolean> {
+  return tauriApi.fetch_local('chat.message.delete.by.session', sessionId) as Promise<boolean>;
+}
+
+// 模拟流式输出的聊天接口（逐字输出，间隔10毫秒）
+export async function chatEvent(agentId: number, sessionId: number, messageId: number, input: string, onData: (chunk: tauriApi.MessageEvent) => void) {
+
+  return await tauriApi.event_local(agentId, sessionId, messageId, input, onData);
 }
 
 // 导出Tauri相关API
 export const isTauriAvailable = tauriApi.isTauriAvailable;
 export const safeTauriCall = tauriApi.safeTauriCall;
+export type MessageEvent = tauriApi.MessageEvent;

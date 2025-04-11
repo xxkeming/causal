@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 interface Response {
   status: string;
@@ -17,7 +17,7 @@ export async function fetch_local(name: string, data: Object | null): Promise<Ob
     console.log('fetch_local:', name, data);
 
     // data 转json字符串
-    let result = await invoke('fetch_local', { name, data: data === null ? "" : JSON.stringify(data)}) as Response;
+    let result = await invoke('fetch', { name, data: data === null ? "" : JSON.stringify(data)}) as Response;
     console.log('fetch_local result:', result);
 
     if (result.status === "error") {
@@ -26,6 +26,50 @@ export async function fetch_local(name: string, data: Object | null): Promise<Ob
     return result.data === undefined ? true : result.data as Object;
   } catch (error) {
     console.error('Failed to call fetch_local function:', error);
+    throw error;
+  }
+}
+
+export type  MessageEvent =
+| {
+    event: 'started';
+  }
+| {
+    event: 'progress';
+    data: {
+      content: string;
+    };
+  }
+| {
+    event: 'finished';
+};
+    
+/**
+ * 调用Tauri后端的event_local函数
+ * @param agnetId 智能体ID
+ * @param content 发送的消息
+ * @returns 返回问候语的Promise
+ */
+export async function event_local(agentId: number, sessionId: number, messageId: number, content: string, onData: (event: MessageEvent) => void): Promise<Object> {
+  try {
+    console.log('event_local:', agentId, content);
+
+    const onEvent = new Channel<MessageEvent>();
+    onEvent.onmessage = (message) => {
+      console.log(`got event ${message.event}`);
+      onData(message);
+    };
+    
+    // data 转json字符串
+    let result = await invoke('event', { agent: agentId, session: sessionId, message: messageId, content, onEvent }) as Response;
+    console.log('event_local result:', result);
+
+    if (result.status === "error") {
+      throw 'error:' + result.error;
+    }
+    return result.data === undefined ? true : result.data as Object;
+  } catch (error) {
+    console.error('Failed to call event_local function:', error);
     throw error;
   }
 }

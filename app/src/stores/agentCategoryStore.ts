@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { AgentCategory } from '../services/typings';
-import { getAgentCategories, addAgentCategory, deleteAgentCategory } from '../services/api';
+import { getAgentCategories, addAgentCategory, updateAgentCategory, deleteAgentCategory } from '../services/api';
 
 export const useAgentCategoryStore = defineStore('agentCategory', () => {
   // 状态
@@ -65,6 +65,32 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
       loading.value = false;
     }
   }
+
+  /**
+   * 更新智能体类别
+   */
+  async function updateCategory(category: AgentCategory): Promise<boolean> {
+    loading.value = true;
+    try {
+      // 调用API更新类别
+      const result = await updateAgentCategory(category);
+      
+      if (result) {
+        // 更新本地状态
+        const index = categories.value.findIndex(c => c.id === category.id);
+        if (index !== -1) {
+          categories.value[index] = category;
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Failed to update category:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
   
   return {
     categories,
@@ -72,6 +98,7 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
     error,
     fetchCategories,
     addCategory,
-    removeCategory
+    removeCategory,
+    updateCategory
   };
 });

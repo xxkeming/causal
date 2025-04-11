@@ -65,6 +65,19 @@
             <div class="session-preview">{{ session.topic }}</div>
           </div>
           <div class="session-actions">
+            <!-- 添加编辑按钮 -->
+            <n-button
+              circle 
+              tertiary 
+              size="tiny"
+              @click.stop="openEditSessionModal(session)"
+              class="session-action-btn"
+            >
+              <template #icon>
+                <n-icon><CreateOutline /></n-icon>
+              </template>
+            </n-button>
+            
             <n-button 
               circle 
               tertiary 
@@ -104,16 +117,43 @@
       </template>
       确定要删除这个会话吗？此操作不可恢复。
     </n-modal>
+
+    <!-- 修改编辑主题的模态框，参考删除确认框的样式 -->
+    <n-modal 
+      v-model:show="editModalVisible" 
+      preset="dialog" 
+      title="编辑会话主题"
+      positive-text="确认"
+      negative-text="取消"
+      @positive-click="updateSessionName"
+      @negative-click="editModalVisible = false"
+      :positive-button-props="{ disabled: !editSessionName.trim(), loading: editLoading }"
+      :transform-origin="'center'"
+      style="margin-top: 80px;"
+    >
+      <template #icon>
+        <n-icon color="#2080f0">
+          <CreateOutline />
+        </n-icon>
+      </template>
+      <n-input 
+        v-model:value="editSessionName" 
+        placeholder="请输入会话主题"
+        autofocus
+        style="margin-top: 12px;"
+      />
+    </n-modal>
   </n-layout-sider>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { NLayoutSider, NIcon, NButton, NScrollbar, NAvatar, NModal, NInput, NTooltip } from 'naive-ui';
-import { AddOutline, TrashOutline, ServerOutline, WarningOutline, SearchOutline } from '@vicons/ionicons5';
+import { AddOutline, TrashOutline, ServerOutline, WarningOutline, SearchOutline, CreateOutline } from '@vicons/ionicons5';
 import { ChatSession } from '../../../services/typings';
 import { useIconStore } from '../../../stores/iconStore';
 import { useAgentStore } from '../../../stores/agentStore';
+import { useChatSessionStore } from '../../../stores/chatSessionStore';
 
 // Props
 const props = defineProps<{
@@ -216,6 +256,43 @@ const filteredSessions = computed(() => {
     session.topic.toLowerCase().includes(keyword)
   );
 });
+
+// 添加ChatSessionStore
+const chatSessionStore = useChatSessionStore();
+
+// 编辑会话相关状态
+const editModalVisible = ref(false);
+const editSessionName = ref('');
+const editSessionId = ref<number | null>(null);
+const editLoading = ref(false);
+
+// 打开编辑会话模态框
+function openEditSessionModal(session: ChatSession) {
+  editSessionId.value = session.id;
+  editSessionName.value = session.topic;
+  editModalVisible.value = true;
+}
+
+// 更新会话名称
+async function updateSessionName() {
+  if (!editSessionId.value || !editSessionName.value.trim()) return;
+
+  editLoading.value = true;
+  try {
+    const success = await chatSessionStore.updateSessionTopic(
+      editSessionId.value,
+      editSessionName.value.trim()
+    );
+
+    if (success) {
+      editModalVisible.value = false;
+    }
+  } catch (error) {
+    console.error('更新会话主题出错:', error);
+  } finally {
+    editLoading.value = false;
+  }
+}
 </script>
 
 <style scoped>
@@ -360,5 +437,15 @@ const filteredSessions = computed(() => {
 
 :deep(.n-modal-body-wrapper) {
   align-items: flex-start;
+}
+
+/* 确保操作按钮样式一致 */
+.session-action-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.session-action-btn:hover {
+  opacity: 1;
 }
 </style>

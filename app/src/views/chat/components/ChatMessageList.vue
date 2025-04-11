@@ -24,7 +24,7 @@
               {{ message.role === 'user' ? '你' : agentName || 'AI助手' }}
             </div>
             <div class="message-time">
-              {{ formatMessageTime(message.timestamp || new Date()) }}
+              {{ formatDate(message.createdAt) }}
             </div>
           </div>
           <div class="message-content">
@@ -126,15 +126,9 @@ defineEmits(['retry', 'send']);
 const messagesContainer = ref<HTMLElement | null>(null);
 
 // 消息时间格式化
-function formatMessageTime(date: Date): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  }).format(date instanceof Date ? date : new Date(date));
+function formatDate(timesamp: number): string {
+  const date = new Date(timesamp);
+  return date.toLocaleDateString('zh-CN');
 }
 
 // 滚动到底部函数
@@ -214,7 +208,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 20px 16px;
-  padding-bottom: 140px;
+  padding-bottom: 180px;
   display: flex;
   flex-direction: column;
   gap: 20px;

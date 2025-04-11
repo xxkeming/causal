@@ -1,137 +1,201 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import * as api from '../services/api';
 import { ChatSession } from '../services/typings';
 
 export const useChatSessionStore = defineStore('chatSession', () => {
-  // 状态 - 只保留会话列表
   const sessions = ref<ChatSession[]>([]);
   const loading = ref(false);
-  const error = ref<string | null>(null);
-  const needRefresh = ref(false);
-  
-  // 计算属性
-  const getSessionsByAgentId = (agentId: number) => {
-    return sessions.value.filter(s => s.agentId === agentId);
-  };
-  
-  // 生成新的会话ID (简单实现，实际应从后端获取)
-  function generateSessionId(): number {
-    const existingIds = sessions.value.map(s => s.id);
-    if (existingIds.length === 0) return 1;
-    return Math.max(...existingIds) + 1;
-  }
-  
-  // 加载会话列表
-  function loadSessions() {
-    try {
-      // 加载会话
-      const storedSessions = localStorage.getItem('chat-sessions');
-      if (storedSessions) {
-        sessions.value = JSON.parse(storedSessions);
-      }
-    } catch (err) {
-      console.error('加载会话记录失败:', err);
-      error.value = '加载会话记录失败';
-    }
-  }
-  
-  // 保存会话数据到本地存储
-  function saveSessions() {
-    try {
-      localStorage.setItem('chat-sessions', JSON.stringify(sessions.value));
-    } catch (err) {
-      console.error('保存会话记录失败:', err);
-      error.value = '保存会话记录失败';
-    }
-  }
-  
-  // 创建新的会话
-  async function createNewSession(agentId: number, topic: string): Promise<ChatSession> {
-    const now = new Date().toISOString();
-    const newSession: ChatSession = {
-      id: generateSessionId(),
-      agentId,
-      topic: topic || "新的对话", // 确保总是有一个默认值
-      createdAt: now,
-      updatedAt: now
-    };
+  const initialized = ref(false);
+
+  /**
+   * 初始化加载所有会话数据
+   */
+  async function initialize() {
+    if (initialized.value) return;
     
-    sessions.value.push(newSession);
-    saveSessions();
-    needRefresh.value = false;
-    
-    return newSession;
-  }
-  
-  // 获取会话信息 - 添加新方法获取单个会话
-  function getSessionById(sessionId: number): ChatSession | null {
-    return sessions.value.find(s => s.id === sessionId) || null;
-  }
-  
-  // 删除会话
-  function deleteSession(sessionId: number) {
-    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId);
-    if (sessionIndex >= 0) {
-      // 删除会话
-      sessions.value.splice(sessionIndex, 1);
-      
-      // 保存更新
-      saveSessions();
-      return true;
+    loading.value = true;
+    try {
+      sessions.value = await api.getAllSessions();
+      initialized.value = true;
+    } catch (error) {
+      console.error('Failed to initialize chat sessions:', error);
+    } finally {
+      loading.value = false;
     }
-    return false;
-  }
-  
-  // 更新会话 - 可用于更新最后活动时间等
-  function updateSession(sessionId: number, updateData: Partial<ChatSession>) {
-    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId);
-    if (sessionIndex >= 0) {
-      // 更新会话数据，保留原有字段
-      sessions.value[sessionIndex] = {
-        ...sessions.value[sessionIndex],
-        ...updateData,
-        updatedAt: new Date().toISOString() // 自动更新时间戳
-      };
-      
-      saveSessions();
-      return true;
-    }
-    return false;
   }
 
-  // 更新会话主题
-  function updateSessionTopic(sessionId: number, topic: string) {
-    return updateSession(sessionId, { topic });
+  /**
+   * 获取所有会话
+   */
+  async function fetchAllSessions() {
+    loading.value = true;
+    try {
+      sessions.value = await api.getAllSessions();
+      return sessions.value;
+    } catch (error) {
+      console.error('Failed to fetch chat sessions:', error);
+      return [];
+    } finally {
+      loading.value = false;
+    }
   }
-  
-  // 设置需要刷新标志
-  function setNeedRefresh() {
-    needRefresh.value = true;
+
+  /**
+   * 根据ID获取会话
+   */
+  function getSessionById(id: number): ChatSession | undefined {
+    return sessions.value.find(session => session.id === id);
   }
-  
-  // 初始化 store - 添加初始化方法
-  function initialize() {
-    loadSessions();
-    needRefresh.value = false;
+
+  /**
+   * 根据智能体ID获取相关会话
+   */
+  function getSessionsByAgentId(agentId: number): ChatSession[] {
+    return sessions.value.filter(session => session.agentId === agentId);
   }
-  
+
+  /**
+   * 创建新会话
+   */
+  async function createNewSession(agentId: number, topic: string): Promise<ChatSession> {
+    loading.value = true;
+    try {
+      const newSession = await api.addSession({
+        agentId,
+        topic
+      });
+      
+      // 将新会话添加到本地状态
+      sessions.value.push(newSession);
+      
+      // 按更新时间排序
+      sortSessions();
+      
+      return newSession;
+    } catch (error) {
+      console.error('Failed to create chat session:', error);
+      throw error;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * 更新会话
+   */
+  async function updateSession(sessionId: number, updateData: Partial<ChatSession>): Promise<boolean> {
+    loading.value = true;
+    try {
+      const sessionIndex = sessions.value.findIndex(s => s.id === sessionId);
+      if (sessionIndex === -1) {
+        throw new Error(`Session with id ${sessionId} not found`);
+      }
+      
+      const existingSession = sessions.value[sessionIndex];
+      const updatedSession: ChatSession = {
+        ...existingSession,
+        ...updateData,
+        updatedAt: Date.now()
+      };
+      
+      const success = await api.updateSession(updatedSession);
+      
+      if (success) {
+        // 更新本地状态
+        sessions.value[sessionIndex] = updatedSession;
+        
+        // 重新排序
+        sortSessions();
+      }
+      
+      return success;
+    } catch (error) {
+      console.error(`Failed to update chat session ${sessionId}:`, error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * 删除会话
+   */
+  async function deleteSession(sessionId: number): Promise<boolean> {
+    loading.value = true;
+    try {
+      const success = await api.deleteSession(sessionId);
+      
+      if (success) {
+        // 从本地状态中删除
+        sessions.value = sessions.value.filter(session => session.id !== sessionId);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error(`Failed to delete chat session ${sessionId}:`, error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * 根据最近更新时间对会话进行排序
+   */
+  function sortSessions() {
+    sessions.value.sort((a, b) => {
+      const timeA = a.updatedAt || a.createdAt;
+      const timeB = b.updatedAt || b.createdAt;
+      return timeB - timeA; // 降序排列，最新的在前面
+    });
+  }
+
+  /**
+   * 计算最近的会话
+   */
+  const recentSessions = computed(() => {
+    return [...sessions.value].sort((a, b) => {
+      const timeA = a.updatedAt || a.createdAt;
+      const timeB = b.updatedAt || b.createdAt;
+      return timeB - timeA;
+    }).slice(0, 5); // 获取最近的5个会话
+  });
+
+  /**
+   * 更新会话主题
+   * @param sessionId 会话ID
+   * @param newTopic 新的主题
+   * @returns 更新是否成功
+   */
+  async function updateSessionTopic(sessionId: number, newTopic: string): Promise<boolean> {
+    if (!newTopic.trim()) {
+      console.error('会话主题不能为空');
+      return false;
+    }
+    
+    try {
+      // 使用已有的updateSession函数，只更新topic字段
+      const success = await updateSession(sessionId, { topic: newTopic.trim() });
+      return success;
+    } catch (error) {
+      console.error(`更新会话主题失败 (ID: ${sessionId}):`, error);
+      return false;
+    }
+  }
+
   return {
-    // 状态
     sessions,
     loading,
-    error,
-    needRefresh,
-    
-    // 方法
+    initialized,
+    recentSessions,
     initialize,
+    fetchAllSessions,
     getSessionById,
     getSessionsByAgentId,
-    loadSessions,
-    saveSessions,
     createNewSession,
-    deleteSession,
     updateSession,
-    updateSessionTopic,
-    setNeedRefresh
+    deleteSession,
+    updateSessionTopic  // 导出新函数
   };
 });

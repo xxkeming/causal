@@ -1,53 +1,69 @@
 use bonsaidb::core::schema::Collection;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// 角色类型
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum ChatRole {
+#[serde(rename_all = "lowercase")]
+pub enum Role {
     User,
     Assistant,
     System,
+    Tool,
 }
 
 /// 消息状态
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum ChatMessageStatus {
+#[serde(rename_all = "lowercase")]
+pub enum MessageStatus {
     Sending,
+    Sent,
+    Processing,
+    Processed,
+    Failed,
+    Timeout,
     Success,
     Error,
 }
 
 /// 聊天消息
-#[derive(Debug, Serialize, Deserialize, Collection)]
-#[collection(name = "chat_messages")]
+#[derive(Debug, Serialize, Deserialize, Collection, Clone)]
+#[collection(name = "chat_messages", primary_key = u64)]
 pub struct ChatMessage {
+    /// 消息ID
+    #[natural_id]
+    pub id: u64,
     /// 所属会话ID
+    #[serde(rename = "sessionId")]
     pub session_id: u64,
     /// 角色
-    pub role: ChatRole,
+    pub role: Role,
     /// 内容
     pub content: String,
     /// 状态
-    pub status: Option<ChatMessageStatus>,
-    /// 时间戳
-    pub timestamp: DateTime<Utc>,
+    pub status: MessageStatus,
+    /// 耗时
+    pub cost: Option<i64>,
     /// 创建时间
-    pub created_at: DateTime<Utc>,
+    #[serde(rename = "createdAt")]
+    pub created_at: i64,
 }
 
 /// 聊天会话
-#[derive(Debug, Serialize, Deserialize, Collection)]
-#[collection(name = "chat_sessions")]
+#[derive(Debug, Serialize, Deserialize, Collection, Clone)]
+#[collection(name = "chat_sessions", primary_key = u64)]
 pub struct ChatSession {
     /// 会话ID
+    #[natural_id]
     pub id: u64,
     /// 智能体ID
-    pub agent_id: String,
+    #[serde(rename = "agentId")]
+    pub agent_id: u64,
     /// 会话主题
     pub topic: String,
     /// 创建时间
-    pub created_at: DateTime<Utc>,
+    #[serde(rename = "createdAt")]
+    pub created_at: i64,
     /// 更新时间
-    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<i64>,
 }

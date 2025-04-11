@@ -32,20 +32,39 @@
               @click="handleSelectCategory(category.id)"
             >
               <div class="category-content category-item-wrapper">
-                <span class="category-name">
-                  {{ category.name }}
-                </span>
-                <n-button 
-                  circle 
-                  size="tiny" 
-                  quaternary 
-                  class="category-delete-btn"
-                  @click.stop="confirmDeleteCategory(category)"
-                >
-                  <template #icon>
-                    <n-icon size="14"><CloseOutline /></n-icon>
+                <n-tooltip placement="right" trigger="hover">
+                  <template #trigger>
+                    <span class="category-name">
+                      {{ category.name }}
+                    </span>
                   </template>
-                </n-button>
+                  {{ category.name }}
+                </n-tooltip>
+                <div class="category-actions">
+                  <!-- 添加编辑按钮 -->
+                  <n-button 
+                    circle 
+                    size="tiny" 
+                    quaternary 
+                    class="category-action-btn"
+                    @click.stop="openEditCategory(category)"
+                  >
+                    <template #icon>
+                      <n-icon size="14"><CreateOutline /></n-icon>
+                    </template>
+                  </n-button>
+                  <n-button 
+                    circle 
+                    size="tiny" 
+                    quaternary 
+                    class="category-action-btn"
+                    @click.stop="confirmDeleteCategory(category)"
+                  >
+                    <template #icon>
+                      <n-icon size="14"><CloseOutline /></n-icon>
+                    </template>
+                  </n-button>
+                </div>
               </div>
             </n-list-item>
             
@@ -140,10 +159,12 @@
         </n-layout>
       </n-layout>
     
-      <!-- 添加类别对话框 -->
+      <!-- 添加/编辑类别对话框 -->
       <agent-category-add-modal
         v-model:visible="showAddCategoryModal"
+        :category="categoryToEdit || undefined"
         @submit="addNewCategory"
+        @update="updateCategory"
       />
     
       <!-- 删除类别确认对话框 -->
@@ -174,11 +195,11 @@
   </template>
 
   <script setup lang="ts">
-  import { ref, computed, onMounted } from 'vue';
+  import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
   import { 
     NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
     NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
-    NEmpty, NSpace, NSpin
+    NEmpty, NSpace, NSpin, NTooltip
   } from 'naive-ui';
   import { 
     ServerOutline, AddOutline, SearchOutline, 
@@ -208,6 +229,7 @@
   const showAddCategoryModal = ref<boolean>(false);
   const showDeleteCategoryModal = ref<boolean>(false);
   const categoryToDelete = ref<AgentCategory | null>(null);
+  const categoryToEdit = ref<AgentCategory | null>(null);
 
   // 计算属性 - 同时处理分类筛选和关键词搜索
   const filteredAgents = computed(() => {
@@ -244,9 +266,8 @@
   }
 
   // 格式化日期字符串
-  function formatDate(dateString: string): string {
-    if (!dateString) return '未知时间';
-    const date = new Date(dateString);
+  function formatDate(timesamp: number): string {
+    const date = new Date(timesamp);
     return date.toLocaleDateString('zh-CN');
   }
 
@@ -291,10 +312,21 @@
     }
   
     try {
+      // 先检查是否已存在同名类别
+      const existingCategory = categoryStore.categories.find(cat => 
+        cat.name.toLowerCase() === name.trim().toLowerCase()
+      );
+      
+      if (existingCategory) {
+        message.warning('类别名称已存在');
+        return; // 不关闭对话框
+      }
+      
       await categoryStore.addCategory(name.trim());
       message.success('类别已添加');
-      // 移除重新加载类别数据的调用，避免重复添加
       showAddCategoryModal.value = false;
+      // 清除可能的编辑状态
+      categoryToEdit.value = null;
     } catch (error) {
       message.error('添加类别失败');
       console.error(error);
@@ -400,6 +432,48 @@
     showDeleteAgentModal.value = false;
     agentToDelete.value = null;
   }
+
+  // 打开编辑分类对话框
+  function openEditCategory(category: AgentCategory) {
+    categoryToEdit.value = category;
+    showAddCategoryModal.value = true;
+  }
+
+  // 编辑分类
+  async function updateCategory(category: AgentCategory) {
+    try {
+      // 检查类别名称是否存在
+      const duplicatedCategory = categoryStore.categories.find(
+        c => c.name.toLowerCase() === category.name.toLowerCase() && 
+             c.id !== category.id
+      );
+      
+      if (duplicatedCategory) {
+        message.warning('分类名称已存在');
+        return; // 不关闭对话框
+      }
+      
+      const success = await categoryStore.updateCategory(category);
+      
+      if (success) {
+        message.success('分类已更新');
+        showAddCategoryModal.value = false;
+        categoryToEdit.value = null;
+      } else {
+        message.error('更新分类失败');
+      }
+    } catch (error) {
+      console.error('更新分类时出错:', error);
+      message.error('更新分类时发生错误');
+    }
+  }
+
+  // 组件卸载时清理状态
+  onBeforeUnmount(() => {
+    categoryToEdit.value = null;
+    categoryToDelete.value = null;
+  });
+
   </script>
 
   <style scoped>
@@ -553,6 +627,18 @@
     padding-top: 8px;
   }
 
+  .add-category {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--primary-color);
+    font-weight: 500;
+  }
+
+  .add-category:hover {
+    background-color: rgba(24, 160, 88, 0.08);
+  }
+  
   .empty-state-container {
     display: flex;
     align-items: center;
@@ -583,9 +669,10 @@
 
   .category-item-wrapper {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     width: 100%;
+    position: relative;
+    min-height: 24px; /* 确保有足够的高度容纳按钮 */
   }
 
   .category-name {
@@ -593,29 +680,52 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 60px;
+    max-width: 75px; /* 增加最大宽度，但保留空间给按钮 */
     cursor: pointer;
   }
 
-  .category-delete-btn {
-    flex-shrink: 0;
-    margin-left: 4px;
+  /* 分类操作按钮容器 - 改为绝对定位，使其悬浮，添加透明效果 */
+  .category-actions {
+    position: absolute;
+    right: 0px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
     visibility: hidden;
+    background-color: transparent; /* 透明背景 */
+    border-radius: 4px;
+    z-index: 2;
+    padding: 0 6px;
+    transition: all 0.2s ease;
   }
 
-  .category-item:hover .category-delete-btn {
+  /* 确保在暗黑模式下也有正确的背景色 */
+  html.dark .category-actions {
+    background-color: transparent; /* 透明背景 */
+  }
+
+  .category-item:hover .category-actions {
     visibility: visible;
   }
 
-  .add-category {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--primary-color);
-    font-weight: 500;
+  .category-action-btn {
+    opacity: 0.6;
+    transition: all 0.2s;
+    margin: 0 1px; /* 减小按钮间距 */
+    padding: 0; /* 移除内边距 */
+    width: 18px; /* 固定按钮宽度 */
+    height: 18px; /* 固定按钮高度 */
+    min-width: unset; /* 移除最小宽度限制 */
+    background-color: transparent; /* 按钮透明背景 */
   }
 
-  .add-category:hover {
-    background-color: rgba(24, 160, 88, 0.08);
+  .category-action-btn:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.1); /* 悬停时轻微背景 */
+  }
+
+  /* 暗色模式悬停效果 */
+  html.dark .category-action-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1); /* 暗模式下悬停背景 */
   }
   </style>

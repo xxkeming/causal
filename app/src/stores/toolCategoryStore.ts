@@ -64,6 +64,32 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
       loading.value = false;
     }
   }
+
+  /**
+   * 更新工具类别
+   */
+  async function updateCategory(category: ToolCategory): Promise<boolean> {
+    loading.value = true;
+    try {
+      // 调用API更新类别
+      const result = await api.updateToolCategory(category);
+      
+      if (result) {
+        // 更新本地状态
+        const index = categories.value.findIndex(c => c.id === category.id);
+        if (index !== -1) {
+          categories.value[index] = category;
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Failed to update category:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
   
   return {
     categories,
@@ -71,6 +97,7 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
     error,
     fetchCategories,
     addCategory,
-    removeCategory
+    removeCategory,
+    updateCategory // 导出新函数
   };
 });

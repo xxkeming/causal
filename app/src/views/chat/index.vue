@@ -40,29 +40,11 @@
             @send="sendMessage"
           />
 
-          <!-- 输入区域 -->
-          <div class="chat-input-floating-container">
-            <div class="chat-input-wrapper">
-              <n-input
-                v-model:value="inputMessage"
-                type="textarea"
-                placeholder="输入消息，按Enter发送，Shift+Enter换行..."
-                :autosize="{ minRows: 1, maxRows: 6 }"
-                class="chat-input"
-                @keydown="handleKeyDown"
-              />
-              <n-button 
-                type="primary" 
-                class="send-button" 
-                :disabled="!canSendMessage"
-                @click="sendMessage()"
-              >
-                <template #icon>
-                  <n-icon><SendOutline /></n-icon>
-                </template>
-              </n-button>
-            </div>
-          </div>
+          <!-- 使用拆分出的输入组件 -->
+          <chat-input 
+            :loading="loading"
+            @send="sendMessage"
+          />
         </template>
 
         <!-- 当没有会话时显示智能体选择界面组件 -->
@@ -92,17 +74,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
-  NLayout, NIcon, NButton, NInput, useMessage
+  NLayout, useMessage
 } from 'naive-ui';
-import { SendOutline } from '@vicons/ionicons5';
 import { Agent, ChatMessage, ChatSession } from '../../services/typings';
 import { useAgentStore } from '../../stores/agentStore';
 import { useIconStore } from '../../stores/iconStore';
 import { useChatSessionStore } from '../../stores/chatSessionStore';
-import { simulateChatStream } from '../../services/api';
+import { chatEvent, MessageEvent  } from '../../services/api';
+import * as api from '../../services/api';
 
 // 导入组件
 import AgentFormModal from '../agents/components/AgentFormModal.vue';
@@ -111,6 +93,7 @@ import ChatSidebar from './components/ChatSidebar.vue';
 import AgentSelector from '../../components/AgentSelector.vue';
 import ChatMessageList from './components/ChatMessageList.vue';
 import NoSessionsAgentGrid from './components/NoSessionsAgentGrid.vue';
+import ChatInput from './components/ChatInput.vue'; // 导入新的输入组件
 
 // 强制刷新
 const forceUpdate = ref(0);
@@ -139,7 +122,6 @@ const messages = ref<ChatMessage[]>([]);
 // 状态
 const agent = ref<Agent | null>(null);
 const loading = ref(false);
-const inputMessage = ref('');
 const siderCollapsed = ref(false);
 
 // 计算属性
@@ -155,8 +137,6 @@ const agentIcon = computed(() => {
   return null;
 });
 
-const canSendMessage = computed(() => inputMessage.value.trim() !== '' && !loading.value);
-
 // 建议问题
 const suggestedPrompts = ref([
   '你能做什么?',
@@ -167,33 +147,19 @@ const suggestedPrompts = ref([
 // 加载当前会话的消息
 async function loadSessionMessages(sessionId: number) {
   try {
-    // 实际项目中应该从API获取消息
-    // 这里我们使用本地存储模拟
-    const key = `chat-messages-${sessionId}`;
-    const storedMessages = localStorage.getItem(key);
-    
-    if (storedMessages) {
-      messages.value = JSON.parse(storedMessages);
-    } else {
-      messages.value = [];
-    }
+    loading.value = true;
+    // 使用API获取会话消息而不是本地存储
+    messages.value = await api.getMessagesBySession(sessionId);
   } catch (error) {
     console.error('加载会话消息失败:', error);
     messages.value = [];
+  } finally {
+    loading.value = false;
   }
 }
 
-// 保存当前会话的消息
-function saveSessionMessages() {
-  if (!currentSessionId.value) return;
-  
-  try {
-    const key = `chat-messages-${currentSessionId.value}`;
-    localStorage.setItem(key, JSON.stringify(messages.value));
-  } catch (error) {
-    console.error('保存会话消息失败:', error);
-  }
-}
+// 不再需要保存消息到本地存储的函数，因为API会处理持久化
+// 删除 saveSessionMessages 函数
 
 // 加载智能体信息
 async function loadAgentInfo() {
@@ -214,7 +180,7 @@ async function loadAgentInfo() {
 
     // 更新模型选择器值
     if (agent.value.model) {
-      selectedModelValue.value = agent.value.model.id + ':' + agent.value.model.name;
+      selectedModelValue.value = agent.value.model.id + '|' + agent.value.model.name;
     }
     
   } catch (error) {
@@ -232,96 +198,121 @@ async function sendApiMessage(text: string) {
 
     // 添加用户消息
     const userMessage = {
+      id: Date.now(), // 临时ID，API会替换
+      sessionId: currentSessionId.value,
       role: 'user' as const,
       content: text,
-      timestamp: new Date(),
-      status: 'success',
-      sessionId: currentSessionId.value
+      status: 'success', // 使用与API匹配的状态
+      createdAt: Date.now()
     };
-    addMessage(userMessage);
+    
+    // 通过API添加用户消息
+    const savedUserMessage = await api.addMessage(userMessage);
+    addMessage(savedUserMessage);
 
     // 添加助手消息
-    const assistantMessage = reactive({
+    const assistantMessage = {
+      id: Date.now() + 1, // 临时ID，API会替换
+      sessionId: currentSessionId.value,
       role: 'assistant' as const,
       content: '',
-      status: 'sending',
-      timestamp: new Date(),
-      sessionId: currentSessionId.value
-    });
-    addMessage(assistantMessage);
+      status: 'sending', // 使用与API匹配的状态
+      createdAt: Date.now()
+    };
+    
+    // 通过API添加助手初始消息
+    const savedAssistantMessage = await api.addMessage(assistantMessage);
+    addMessage(savedAssistantMessage);
+    const assistantIndex = messages.value.findIndex(msg => msg.id === savedAssistantMessage.id);
 
     // 模拟流式输出
-    await simulateChatStream(text, async (chunk) => {
-      // 更新助手消息的状态和内容
-      if (assistantMessage.status !== 'sending') {
-        assistantMessage.status = 'streaming';
+    await chatEvent(agent.value.id, currentSessionId.value, savedAssistantMessage.id, text, async (event: MessageEvent) => {
+      
+      switch (event.event) {
+        case 'started':
+          console.log('started');
+          messages.value[assistantIndex].content = '';
+          break;
+        case 'finished':
+          // 要等到流式输出完成后再更新最终状态
+          console.log('finished');
+          console.log(messages.value[assistantIndex].content);
+          messages.value[assistantIndex].status = 'success';
+
+          // 通过API更新最终状态
+          await api.updateMessage(messages.value[assistantIndex]);
+          break;
+        case 'progress':
+          // 处理流式输出
+          // 更新助手消息的状态和内容
+          messages.value[assistantIndex].content = messages.value[assistantIndex].content + event.data.content;
+          messages.value[assistantIndex].status = 'processing';
+          break;
       }
-      assistantMessage.content += chunk; // 实时更新内容
-      updateLastMessage({ content: assistantMessage.content }); // 确保更新到最后一条消息
+
       await nextTick(); // 确保视图更新
     });
-
-    // 更新助手消息的状态
-    assistantMessage.status = 'success';
-    updateLastMessage({ status: assistantMessage.status });
 
   } catch (error) {
     console.error('API 请求失败:', error);
 
-    // 更新助手消息为错误状态
-    updateLastMessage({
-      status: 'error',
-      content: '获取回复失败，请重试'
-    });
+    // 如果存在助手消息，更新为错误状态
+    const assistantIndex = messages.value.findIndex(msg => 
+      msg.role === 'assistant' && (msg.status === 'sending' || msg.status === 'processing')
+    );
+    
+    if (assistantIndex !== -1) {
+      const errorMessage = {
+        ...messages.value[assistantIndex],
+        content: '获取回复失败，请重试',
+        status: 'Error'
+      };
+      
+      // 通过API更新错误状态
+      await api.updateMessage(errorMessage);
+      
+      // 更新本地状态
+      messages.value[assistantIndex] = errorMessage;
+    }
 
   } finally {
     loading.value = false;
   }
 }
 
-// 添加消息
+// 添加消息 - 仅更新本地状态，API调用在其他函数中进行
 function addMessage(message: ChatMessage) {
+  // 添加到本地消息列表
   messages.value.push(message);
-  saveSessionMessages();
 
   // 如果是有会话的情况，更新会话的更新时间
   if (currentSessionId.value) {
+    const timestamp = Date.now();
     chatSessionStore.updateSession(currentSessionId.value, {
-      updatedAt: new Date().toISOString() // 这里保留字符串，因为updateSession API期望字符串
+      updatedAt: timestamp
     });
   }
 }
 
-// 更新最后一条消息
-function updateLastMessage(updates: Partial<ChatMessage>) {
-  const lastMessage = messages.value[messages.value.length - 1];
-  if (lastMessage) {
-    Object.assign(lastMessage, updates); // 合并更新
-    saveSessionMessages(); // 保存更新后的消息
-  }
-}
-
 // 删除消息
-function removeMessage(index: number) {
+async function removeMessage(index: number) {
   if (index >= 0 && index < messages.value.length) {
+    const messageToDelete = messages.value[index];
+    
+    // 通过API删除消息
+    await api.deleteMessage(messageToDelete.id);
+    
+    // 更新本地状态
     messages.value.splice(index, 1);
-    saveSessionMessages();
   }
 }
 
 // 发送消息
-async function sendMessage(text?: string) {
-  const messageText = text || inputMessage.value.trim();
-  
-  if (!messageText || loading.value) return;
-  
-  // 清空输入框
-  if (!text) {
-    inputMessage.value = '';
-  }
+async function sendMessage(text: string) {
+  if (!text || loading.value) return;
   
   // 通过API发送消息
-  await sendApiMessage(messageText);
+  await sendApiMessage(text);
 }
 
 // 重试发送消息
@@ -338,19 +329,19 @@ async function retryMessage(index: number) {
   }
 }
 
-// Enter键发送消息
-function handleKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey && canSendMessage.value) {
-    e.preventDefault();
-    sendMessage();
-  }
-}
-
 // 清除当前会话消息
-function clearSession() {
+async function clearSession() {
   if (currentSessionId.value) {
-    messages.value = [];
-    saveSessionMessages();
+    try {
+      // 通过API删除会话的所有消息
+      await api.deleteMessagesBySession(currentSessionId.value);
+      
+      // 更新本地状态
+      messages.value = [];
+    } catch (error) {
+      console.error('清除会话消息失败:', error);
+      message.error('清除会话消息失败');
+    }
   }
 }
 
@@ -384,21 +375,41 @@ async function switchSession(sessionId: number) {
     
     // 强制刷新侧边栏
     forceUpdate.value += 1;
+
+    // 自动折叠侧边栏，为聊天内容提供更多空间
+    siderCollapsed.value = true;
   }
 }
 
 // 删除会话
-function deleteSession(sessionId: number) {
-  chatSessionStore.deleteSession(sessionId);
-  
-  // 如果删除的是当前会话，则关闭当前会话
-  if (currentSessionId.value === sessionId) {
-    closeSession();
-  }
-  
-  // 如果还有其他会话，则切换到第一个会话
-  if (chatSessionStore.sessions.length > 0) {
-    switchSession(chatSessionStore.sessions[0].id);
+async function deleteSession(sessionId: number) {
+  try {
+    const isCurrentSession = currentSessionId.value === sessionId;
+    
+    // 调用 store 删除会话
+    const success = await chatSessionStore.deleteSession(sessionId);
+    
+    if (success) {
+      message.success('会话已删除');
+      
+      // 如果删除的是当前会话，则关闭当前会话
+      if (isCurrentSession) {
+        closeSession();
+      }
+      
+      // 如果还有其他会话并且当前会话被关闭了，则切换到第一个可用会话
+      if (chatSessionStore.sessions.length > 0 && !hasActiveSession.value) {
+        await switchSession(chatSessionStore.sessions[0].id);
+      }
+      
+      // 强制刷新侧边栏
+      forceUpdate.value += 1;
+    } else {
+      message.error('删除会话失败');
+    }
+  } catch (error) {
+    console.error('删除会话出错:', error);
+    message.error('删除会话时出错');
   }
 }
 
@@ -542,46 +553,5 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   background-color: var(--surface-color, #ffffff);
-}
-
-/* 浮动输入框样式 */
-.chat-input-floating-container {
-  position: sticky;
-  bottom: 0;
-  padding: 16px;
-  background-color: transparent;
-  z-index: 10;
-}
-
-.chat-input-wrapper {
-  display: flex;
-  gap: 12px;
-  background-color: var(--card-color, #ffffff);
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  max-width: 850px;
-  margin: 0 auto;
-}
-
-.chat-input-wrapper:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.chat-input {
-  flex: 1;
-}
-
-.send-button {
-  align-self: flex-end;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.send-button:hover:not(:disabled) {
-  transform: scale(1.05);
 }
 </style>
