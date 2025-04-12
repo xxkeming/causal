@@ -25,6 +25,9 @@ pub struct Provider {
     /// API密钥
     #[serde(rename = "apiKey")]
     pub api_key: Option<String>,
+    /// stream
+    #[serde(default)]
+    pub stream: bool,
     /// 支持的模型
     pub models: Option<Vec<Model>>,
     /// 创建时间

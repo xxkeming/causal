@@ -5,7 +5,7 @@ authors = ["Jiang <hackfree@msn.com>"]
 
 [workspace]
 resolver = "2"
-members = ["app/src-tauri", "store"]
+members = ["app/src-tauri", "store", "tools"]
 # exclude = ["app"]
 # default-members = ["app"]
 

@@ -25,6 +25,14 @@ pub enum MessageStatus {
     Error,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Attachment {
+    pub name: String,
+    pub size: u64,
+    // 文件内容,经过base64编码
+    pub data: String,
+}
+
 /// 聊天消息
 #[derive(Debug, Serialize, Deserialize, Collection, Clone)]
 #[collection(name = "chat_messages", primary_key = u64)]
@@ -39,6 +47,8 @@ pub struct ChatMessage {
     pub role: Role,
     /// 内容
     pub content: String,
+    /// 附件
+    pub attachments: Option<Vec<Attachment>>,
     /// 状态
     pub status: MessageStatus,
     /// 耗时

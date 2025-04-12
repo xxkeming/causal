@@ -313,6 +313,7 @@ mod tests {
             status: MessageStatus::Sending,
             cost: Some(0),
             created_at: 0, // 将被自动设置
+            attachments: None,
         };
 
         // 测试添加
@@ -350,6 +351,7 @@ mod tests {
                 status: MessageStatus::Success,
                 cost: Some(i as i64),
                 created_at: Utc::now().timestamp() + i as i64, // 递增的时间戳
+                attachments: None,
             };
             store.add_chat_message(msg).unwrap();
         }
@@ -383,6 +385,7 @@ mod tests {
             status: MessageStatus::Sending,
             cost: Some(0),
             created_at: Utc::now().timestamp(),
+            attachments: None,
         };
         store.add_chat_message(msg).unwrap();
 
@@ -412,6 +415,7 @@ mod tests {
             status: MessageStatus::Success,
             cost: Some(0),
             created_at: 0,
+            attachments: None,
         };
 
         // 测试添加 - 应该失败

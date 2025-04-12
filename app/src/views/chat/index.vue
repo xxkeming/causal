@@ -37,6 +37,7 @@
             :loading="loading"
             :suggested-prompts="suggestedPrompts"
             @retry="retryMessage"
+            @delete="deleteMessage"
             @send="sendMessage"
           />
 
@@ -79,7 +80,7 @@ import { useRouter } from 'vue-router';
 import { 
   NLayout, useMessage
 } from 'naive-ui';
-import { Agent, ChatMessage, ChatSession } from '../../services/typings';
+import { Agent, ChatMessage, ChatSession, Attachment } from '../../services/typings';
 import { useAgentStore } from '../../stores/agentStore';
 import { useIconStore } from '../../stores/iconStore';
 import { useChatSessionStore } from '../../stores/chatSessionStore';
@@ -189,21 +190,65 @@ async function loadAgentInfo() {
   }
 }
 
-// 发送API消息
-async function sendApiMessage(text: string) {
-  if (!agent.value || !text.trim() || !currentSessionId.value) return;
+// 添加消息 - 仅更新本地状态，API调用在其他函数中进行
+function addMessage(message: ChatMessage) {
+  // 添加到本地消息列表
+  messages.value.push(message);
+
+  // 如果是有会话的情况，更新会话的更新时间
+  if (currentSessionId.value) {
+    const timestamp = Date.now();
+    chatSessionStore.updateSession(currentSessionId.value, {
+      updatedAt: timestamp
+    });
+  }
+}
+
+// 发送消息
+async function sendMessage(text: string, files?: File[]) {
+  if ((!text && (!files || files.length === 0)) || loading.value) return;
+
+  if (agent.value === null) {
+    message.error('请先选择智能体');
+    return;
+  }
+
+  if (currentSessionId.value === null) {
+    message.error('请先选择会话');
+    return;
+  }
 
   try {
     loading.value = true;
 
+    // 生成attachments数组, 给userMessage
+    // 如果有文件，读取内容并base64编码,添加到消息中
+    const attachments : Attachment[] | undefined = files ? await Promise.all(files.map(file => {
+      return new Promise<Attachment>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // 过滤掉里面的前缀,只保留base64部分
+          const base64Data = (reader.result as string).split(',')[1];
+          // 解base64成字符串
+          const base64String = atob(base64Data);
+          resolve({ name: file.name, size: file.size, data: base64String});
+        };
+        reader.onerror = () => {
+          reject(new Error('文件读取失败:' + file.name));
+        };
+        reader.readAsDataURL(file);
+      });
+    })) : undefined;
+
     // 添加用户消息
     const userMessage = {
       id: Date.now(), // 临时ID，API会替换
-      sessionId: currentSessionId.value,
+      sessionId: currentSessionId.value as number,
       role: 'user' as const,
       content: text,
       status: 'success', // 使用与API匹配的状态
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      attachments: attachments ? attachments : undefined
     };
     
     // 通过API添加用户消息
@@ -212,8 +257,8 @@ async function sendApiMessage(text: string) {
 
     // 添加助手消息
     const assistantMessage = {
-      id: Date.now() + 1, // 临时ID，API会替换
-      sessionId: currentSessionId.value,
+      id: savedUserMessage.id + 1, // 临时ID，API会替换
+      sessionId: currentSessionId.value as number,
       role: 'assistant' as const,
       content: '',
       status: 'sending', // 使用与API匹配的状态
@@ -225,9 +270,21 @@ async function sendApiMessage(text: string) {
     addMessage(savedAssistantMessage);
     const assistantIndex = messages.value.findIndex(msg => msg.id === savedAssistantMessage.id);
 
-    // 模拟流式输出
-    await chatEvent(agent.value.id, currentSessionId.value, savedAssistantMessage.id, text, async (event: MessageEvent) => {
-      
+    // 将文件信息传递给API
+    await sendApiMessage(agent.value.id as number, currentSessionId.value as number, savedAssistantMessage.id, assistantIndex);
+  } catch (error) {
+    console.error('API 请求失败:', error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function sendApiMessage(agentId: number, sessionId: number, messageId: number, assistantIndex: number) {
+  try {
+    loading.value = true;
+
+    // 模拟流式输出，将文件信息传递给API
+    await chatEvent(agentId, sessionId, messageId, async (event: MessageEvent) => {
       switch (event.event) {
         case 'started':
           console.log('started');
@@ -256,76 +313,64 @@ async function sendApiMessage(text: string) {
   } catch (error) {
     console.error('API 请求失败:', error);
 
-    // 如果存在助手消息，更新为错误状态
-    const assistantIndex = messages.value.findIndex(msg => 
-      msg.role === 'assistant' && (msg.status === 'sending' || msg.status === 'processing')
-    );
+    const errorMessage = {
+      ...messages.value[assistantIndex],
+      content: JSON.stringify(error),
+      status: 'error'
+    };
     
-    if (assistantIndex !== -1) {
-      const errorMessage = {
-        ...messages.value[assistantIndex],
-        content: '获取回复失败，请重试',
-        status: 'Error'
-      };
-      
-      // 通过API更新错误状态
-      await api.updateMessage(errorMessage);
-      
-      // 更新本地状态
-      messages.value[assistantIndex] = errorMessage;
-    }
-
+    // 通过API更新错误状态
+    await api.updateMessage(errorMessage);
+    
+    // 更新本地状态
+    messages.value[assistantIndex] = errorMessage;
   } finally {
     loading.value = false;
   }
 }
 
-// 添加消息 - 仅更新本地状态，API调用在其他函数中进行
-function addMessage(message: ChatMessage) {
-  // 添加到本地消息列表
-  messages.value.push(message);
-
-  // 如果是有会话的情况，更新会话的更新时间
-  if (currentSessionId.value) {
-    const timestamp = Date.now();
-    chatSessionStore.updateSession(currentSessionId.value, {
-      updatedAt: timestamp
-    });
-  }
-}
-
-// 删除消息
-async function removeMessage(index: number) {
-  if (index >= 0 && index < messages.value.length) {
-    const messageToDelete = messages.value[index];
-    
-    // 通过API删除消息
-    await api.deleteMessage(messageToDelete.id);
-    
-    // 更新本地状态
-    messages.value.splice(index, 1);
-  }
-}
-
-// 发送消息
-async function sendMessage(text: string) {
-  if (!text || loading.value) return;
-  
-  // 通过API发送消息
-  await sendApiMessage(text);
-}
-
-// 重试发送消息
+// 修复重试消息功能
 async function retryMessage(index: number) {
-  const lastUserMessageIndex = messages.value
-    .slice(0, index)
-    .map((msg, i) => ({ ...msg, index: i }))
-    .filter(msg => msg.role === 'user')
-    .pop();
+  const currentMessage = messages.value[index];
+  if (!currentMessage || !currentSessionId.value || !agent.value) return;
+  
+  // 判断索引是否存在, 找到要重试消息之前的最后一条用户消息
+  let userMessageIndex = index - 1;
+  const userMessage = messages.value[userMessageIndex] as ChatMessage;
+
+  if (!userMessage || userMessage.role !== 'user') {
+    message.error('找不到相关的用户消息');
+    return;
+  }
+
+  messages.value[index].content = ''; // 清空当前消息内容
+  messages.value[index].status = 'sending'; // 设置状态为发送中
+  messages.value[index].createdAt = Date.now(); // 更新创建时间
+  await api.updateMessage(messages.value[index]);
+
+  // 重新发送用户消息
+  await sendApiMessage(agent.value.id as number, currentSessionId.value as number, currentMessage.id, index);
+}
+
+// 修复删除消息功能
+async function deleteMessage(index: number) {
+  const currentMessage = messages.value[index];
+  if (!currentMessage) return;
+  
+  try {
+    // 如果消息有ID，从数据库中删除
+    if (currentMessage.id) {
+      await api.deleteMessage(currentMessage.id);
+    }
     
-  if (lastUserMessageIndex) {
-    removeMessage(index);
-    await sendMessage(lastUserMessageIndex.content);
+    // 从界面中删除消息
+    messages.value.splice(index, 1);
+    
+    // 通知用户
+    message.success('消息已删除');
+  } catch (error) {
+    console.error('删除消息失败', error);
+    message.error('删除消息失败');
   }
 }
 
@@ -377,7 +422,7 @@ async function switchSession(sessionId: number) {
     forceUpdate.value += 1;
 
     // 自动折叠侧边栏，为聊天内容提供更多空间
-    siderCollapsed.value = true;
+    // siderCollapsed.value = true;
   }
 }
 
@@ -422,7 +467,7 @@ function toggleSidebar() {
 async function handleModelChange(newModel: any) {
   try {
     if (!agent.value || 
-        (agent.value.model?.id === newModel.providerId && 
+        (agent.value.model?.id === Number(newModel.providerId) && 
          agent.value.model?.name === newModel.modelName)) return;
     
     loading.value = true;
@@ -430,7 +475,7 @@ async function handleModelChange(newModel: any) {
     const newAgent = {
       ...agent.value,
       model: {
-        id: newModel.providerId,
+        id: Number(newModel.providerId),
         name: newModel.modelName
       }
     };

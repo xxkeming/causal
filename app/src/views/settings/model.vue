@@ -103,6 +103,10 @@
                       placeholder="请选择API接口类型"
                     />
                   </n-form-item>
+
+                  <n-form-item label="流式响应" class="form-item-stream">
+                    <n-switch v-model:value="formModel.stream" />
+                  </n-form-item>
                 </div>
                 
                 <n-form-item required>
@@ -246,6 +250,7 @@ import {
   NSpin,
   NModal,
   NPopover,
+  NSwitch,
   FormRules,
   useMessage
 } from 'naive-ui';
@@ -278,6 +283,7 @@ const defaultFormModel = {
   apiCategory: '',
   url: '',
   apiKey: '',
+  stream: true, // 添加 stream 属性
   models: [] as Model[] // 明确标注类型为ProviderModel[]
 };
 
@@ -287,6 +293,7 @@ const formModel = reactive<{
   apiCategory: string;
   url: string;
   apiKey: string;
+  stream: boolean; // 添加 stream 类型
   models: Model[]; // 明确标注类型
 }>({...defaultFormModel});
 
@@ -386,6 +393,7 @@ async function selectProvider(id: number) {
         apiCategory: provider.apiCategory,
         url: provider.url || '',
         apiKey: provider.apiKey || '',
+        stream: provider.stream || false,
         models: provider.models ? [...provider.models] : []
       });
     } else {
@@ -516,7 +524,8 @@ async function saveProvider() {
       apiCategory: formModel.apiCategory,
       url: formModel.url,
       apiKey: formModel.apiKey,
-      models: formModel.models
+      models: formModel.models,
+      stream: formModel.stream
     };
     
     if (isCreating.value) {
@@ -810,6 +819,12 @@ onMounted(async () => {
 .form-item-category {
   flex: 1;
   min-width: 200px;
+}
+
+.form-item-stream {
+  flex: 0 0 auto;
+  min-width: 120px;
+  margin-left: 20px;
 }
 
 /* 确保表单项在同一行正确显示 */

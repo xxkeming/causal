@@ -24,6 +24,9 @@ export interface Provider {
   url: string;
   apiKey?: string;
 
+  // 是否流式调用
+  stream: boolean;
+
   models?: Model[];
 }
 
@@ -195,6 +198,13 @@ export interface KnowledgeBaseDocument {
   updatedAt?: string;
 }
 
+export interface Attachment {
+  name: string;
+  size: number;
+  // 文件内容,经过base64编码
+  data: string;
+}
+
 // 聊天信息
 export interface ChatMessage {
   // 消息ID
@@ -205,6 +215,10 @@ export interface ChatMessage {
 
   role: 'user' | 'assistant' | 'system';
   content: string;
+
+  // 附件
+  attachments?: Attachment[];
+
   status: string;
   createdAt: number;
   updatedAt?: number;

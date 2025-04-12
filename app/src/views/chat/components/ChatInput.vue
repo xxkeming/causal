@@ -5,40 +5,145 @@
         v-model:value="inputMessage"
         type="textarea"
         placeholder="输入消息，按Enter发送，Shift+Enter换行..."
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        :autosize="{ minRows: 1, maxRows: 20 }"
         class="chat-input"
         @keydown="handleKeyDown"
+        :show-count="false"
       />
-      <n-button 
-        type="primary" 
-        class="send-button" 
-        :disabled="!canSendMessage"
-        @click="sendMessage()"
-      >
-        <template #icon>
-          <n-icon><SendOutline /></n-icon>
-        </template>
-      </n-button>
+      
+      <div class="input-toolbar">
+        <!-- 左侧上传附件按钮和文件列表 -->
+        <n-tooltip trigger="hover">
+          <template #trigger>
+            <div class="toolbar-left">
+              <input 
+                type="file" 
+                ref="fileInputRef" 
+                class="native-file-input"
+                @change="handleFilesSelected" 
+                multiple
+                accept=".txt,.md,.json,.csv,.pdf,.doc,.docx,.xls,.xlsx"
+              />
+              
+              <n-button class="tool-button" text @click="triggerFileInput">
+                <template #icon>
+                  <n-icon><AttachOutline /></n-icon>
+                </template>
+              </n-button>
+
+              <!-- 文件列表显示区 -->
+              <div v-if="selectedFiles.length > 0" class="file-list">
+                <div v-for="(file, index) in selectedFiles" :key="index" class="file-tag">
+                  <n-icon class="file-icon" :color="fileIconStore.getIconByFilename(file.name).color">
+                    <component :is="fileIconStore.getIconByFilename(file.name).icon" />
+                  </n-icon>
+                  <span class="file-name">{{ file.name }}</span>
+                  <n-button quaternary circle size="tiny" @click="removeFile(index)" class="file-remove-btn">
+                    <template #icon>
+                      <n-icon><CloseCircleOutline /></n-icon>
+                    </template>
+                  </n-button>
+                </div>
+              </div>
+            </div>
+          </template>
+          上下文附件
+        </n-tooltip>
+
+        <!-- 右侧发送按钮 -->
+        <div class="toolbar-right">
+          <n-button 
+            class="tool-button" 
+            text
+            :disabled="!canSendMessage && !props.loading"
+            @click="handleSendOrStop()"
+          >
+            <template #icon>
+              <n-icon>
+                <component :is="props.loading ? PauseCircleOutline : SendOutline" />
+              </n-icon>
+            </template>
+          </n-button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { NInput, NButton, NIcon } from 'naive-ui';
-import { SendOutline } from '@vicons/ionicons5';
+import { NInput, NButton, NIcon, NTooltip, useMessage } from 'naive-ui';
+import { SendOutline, AttachOutline, CloseCircleOutline, PauseCircleOutline } from '@vicons/ionicons5';
+import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
 
 const props = defineProps<{
   loading: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void;
+  (e: 'send', text: string, files?: File[]): void;
 }>();
 
 const inputMessage = ref('');
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const selectedFiles = ref<File[]>([]);
+const message = useMessage();
 
-const canSendMessage = computed(() => inputMessage.value.trim() !== '' && !props.loading);
+// 获取文件图标存储
+const fileIconStore = useFileIconStore();
+
+const canSendMessage = computed(() => 
+  (inputMessage.value.trim() !== '' || selectedFiles.value.length > 0) && 
+  !props.loading
+);
+
+// 触发文件选择对话框
+function triggerFileInput() {
+  if (fileInputRef.value) {
+    fileInputRef.value.click();
+  }
+}
+
+// 处理选择的文件
+function handleFilesSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    // 复制FileList为数组
+    const newFiles = Array.from(target.files);
+    
+    // 文件大小限制检查 (每个文件10MB)
+    const maxSize = 10 * 1024 * 1024;
+    const oversizedFiles = newFiles.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      message.warning(`有${oversizedFiles.length}个文件超过10MB大小限制，已被过滤`);
+      // 过滤掉超大文件
+      const validFiles = newFiles.filter(file => file.size <= maxSize);
+      selectedFiles.value.push(...validFiles);
+    } else {
+      // 所有文件都符合大小要求
+      selectedFiles.value.push(...newFiles);
+    }
+    
+    // 重置文件输入框，这样可以再次选择同一文件
+    if (fileInputRef.value) {
+      fileInputRef.value.value = '';
+    }
+  }
+}
+
+// 移除特定文件
+function removeFile(index: number) {
+  selectedFiles.value.splice(index, 1);
+}
+
+// 清除所有已选择的文件
+function clearSelectedFiles() {
+  selectedFiles.value = [];
+  if (fileInputRef.value) {
+    fileInputRef.value.value = '';
+  }
+}
 
 // Enter键发送消息
 function handleKeyDown(e: KeyboardEvent) {
@@ -54,10 +159,21 @@ function handleKeyDown(e: KeyboardEvent) {
 // 发送消息
 function sendMessage() {
   const text = inputMessage.value.trim();
-  if (!text || props.loading) return;
+  if ((!text && selectedFiles.value.length === 0) || props.loading) return;
   
-  emit('send', text);
-  inputMessage.value = ''; // 清空输入框
+  emit('send', text, selectedFiles.value.length > 0 ? [...selectedFiles.value] : undefined);
+  inputMessage.value = '';
+  clearSelectedFiles();
+}
+
+// 处理发送或停止
+function handleSendOrStop() {
+  if (props.loading) {
+    // 停止逻辑（如果需要）
+    console.log('Stop action triggered');
+  } else {
+    sendMessage();
+  }
 }
 </script>
 
@@ -73,9 +189,10 @@ function sendMessage() {
 
 .chat-input-wrapper {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  background-color: var(--card-color, #ffffff);
-  padding: 4px 12px;
+  background-color: #fff;
+  padding: 4px 6px;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
@@ -91,13 +208,7 @@ function sendMessage() {
 
 .chat-input {
   flex: 1;
-  min-height: 50px; /* 添加固定的最小高度，确保默认显示2行 */
-}
-
-/* 移除输入框边框和背景，使其融入整体 */
-.chat-input :deep(.n-input) {
-  border: none;
-  background: transparent;
+  padding: 0px 6px;
 }
 
 .chat-input :deep(.n-input__border),
@@ -106,44 +217,205 @@ function sendMessage() {
 }
 
 .chat-input :deep(.n-input-wrapper) {
-  padding: 0;
-  background-color: transparent;
+  padding: 0px 6px;
+  background-color: #fff;
 }
 
 .chat-input :deep(textarea) {
-  min-height: 50px;
   line-height: 1.5;
-  padding: 0;
   background-color: transparent;
-  resize: none; /* 防止用户手动调整大小 */
   font-size: 15px; /* 调整字体大小 */
 }
 
-.send-button {
-  align-self: center; /* 调整为居中对齐 */
-  width: 44px; /* 固定宽度 */
-  height: 44px; /* 固定高度使按钮成为正方形 */
-  border-radius: 14px; /* 增大圆角 */
+/* 特别针对 n-input 组件的滚动条隐藏 */
+.chat-input :deep(.n-textarea) {
+  --n-scrollbar-width: 0 !important;
+  --n-scrollbar-color: transparent !important;
+}
+
+.chat-input :deep(.n-scrollbar) {
+  overflow: hidden !important;
+}
+
+.chat-input :deep(.n-scrollbar-rail) {
+  display: none;
+}
+
+/* 移除可能限制高度的设置，允许文本框自由扩展 */
+.chat-input :deep(.n-input__textarea),
+.chat-input :deep(.n-input-wrapper) {
+  max-height: none !important;
+}
+
+/* 工具栏按钮通用样式 - 同时应用于附件和发送按钮 */
+.tool-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
   display: flex;
   justify-content: center;
   align-items: center;
-  transition: all 0.2s ease;
-  padding: 0; /* 重置内边距 */
+  color: #666;
+  transition: all 0.2s;
+  margin-left: 4px;
+}
+
+.tool-button:not(:disabled):hover {
+  color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.tool-button:not(:disabled):active {
+  color: var(--primary-color-hover);
+  transform: scale(0.95);
+}
+
+.tool-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 附件按钮特殊处理 */
+.toolbar-left .tool-button {
+  pointer-events: none;
+  margin-left: 0;
+}
+
+/* 底部工具栏 */
+.input-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.native-file-input:hover + .tool-button {
+  color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.native-file-input:active + .tool-button {
+  color: var(--primary-color-hover);
+  transform: scale(0.95);
+}
+
+/* 文件列表显示区样式 */
+.file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 8px;
+  overflow: hidden;
+}
+
+.file-tag {
+  display: flex;
+  align-items: center;
+  background-color: var(--n-color, rgba(24, 160, 88, 0.1));
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--n-text-color, #333);
+  transition: all 0.2s;
+  border: 1px solid var(--n-border-color, rgba(24, 160, 88, 0.2));
+}
+
+.file-tag:hover {
+  background-color: var(--n-color-hover, rgba(24, 160, 88, 0.15));
+}
+
+.file-icon {
+  font-size: 15px;
+  margin-right: 6px;
+  opacity: 0.8;
+}
+
+.file-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-remove-btn {
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  color: var(--n-close-icon-color, rgba(24, 160, 88, 0.6));
+  transition: all 0.2s;
+}
+
+.file-remove-btn:hover {
+  color: var(--n-close-icon-color-hover, rgba(24, 160, 88, 0.8));
+  background-color: var(--n-close-color-hover, rgba(24, 160, 88, 0.1));
+}
+
+.file-remove-btn:active {
+  background-color: var(--n-close-color-pressed, rgba(24, 160, 88, 0.15));
+}
+
+/* 自定义文件选择器样式 */
+.native-file-input {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.native-file-input::-webkit-file-upload-button {
+  display: none;
+}
+
+.native-file-input::file-selector-button {
+  display: none;
+}
+
+/* 隐藏以前的文件信息显示 */
+.file-info {
+  display: none;
+}
+
+/* 文件列表样式 */
+.selected-files {
+  display: none;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: #eaeaea;
+}
+
+.file-name {
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 8px;
+}
+
+.files-count {
+  font-size: 13px;
+  color: #666;
   margin-left: 8px;
 }
 
-.send-button :deep(.n-icon) {
-  font-size: 20px; /* 增大图标尺寸 */
-  margin-right: 0; /* 确保图标居中 */
-}
-
-.send-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 悬浮时添加阴影 */
-}
-
-.send-button:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* 点击时减小阴影 */
+.file-icon {
+  font-size: 14px;
+  margin-right: 4px;
 }
 </style>

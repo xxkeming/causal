@@ -21,6 +21,7 @@
         <template #trigger>
           <n-button quaternary circle class="agent-button" 
             :style="{ backgroundColor: agentIcon?.color || '#18a058', color: 'white' }"
+             @click="onShowConfig"
           >
             <n-icon size="20">
               <component :is="agentIcon?.icon || ServerOutline" />
@@ -42,14 +43,14 @@
       </div>
       
       <!-- 配置按钮 - 修复图标 -->
-      <n-tooltip trigger="hover">
+      <!-- <n-tooltip trigger="hover">
         <template #trigger>
           <n-button class="action-button" circle tertiary size="small" @click="onShowConfig">
             <n-icon><SettingsOutline /></n-icon>
           </n-button>
         </template>
         编辑智能体配置
-      </n-tooltip>
+      </n-tooltip> -->
     </n-space>
     
     <!-- 右侧按钮组 - 修复图标 -->
@@ -80,7 +81,7 @@ import {
   NIcon, NButton, NTooltip, NSpace
 } from 'naive-ui';
 import { 
-  ServerOutline, TrashBinOutline, CloseOutline, SettingsOutline,
+  ServerOutline, TrashBinOutline, CloseOutline,
   MenuOutline
 } from '@vicons/ionicons5';
 import { Agent } from '../../../services/typings';

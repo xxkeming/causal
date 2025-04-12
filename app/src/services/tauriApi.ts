@@ -50,9 +50,9 @@ export type  MessageEvent =
  * @param content 发送的消息
  * @returns 返回问候语的Promise
  */
-export async function event_local(agentId: number, sessionId: number, messageId: number, content: string, onData: (event: MessageEvent) => void): Promise<Object> {
+export async function event_local(agentId: number, sessionId: number, messageId: number, onData: (event: MessageEvent) => void): Promise<Object> {
   try {
-    console.log('event_local:', agentId, content);
+    console.log('event_local:', agentId, sessionId, messageId);
 
     const onEvent = new Channel<MessageEvent>();
     onEvent.onmessage = (message) => {
@@ -61,7 +61,7 @@ export async function event_local(agentId: number, sessionId: number, messageId:
     };
     
     // data 转json字符串
-    let result = await invoke('event', { agent: agentId, session: sessionId, message: messageId, content, onEvent }) as Response;
+    let result = await invoke('event', { agent: agentId, session: sessionId, message: messageId, onEvent }) as Response;
     console.log('event_local result:', result);
 
     if (result.status === "error") {

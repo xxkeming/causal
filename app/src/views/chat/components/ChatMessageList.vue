@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-messages" ref="messagesContainer">
+  <div class="chat-messages" ref="scrollContainer" @scroll="handleScroll">
     <!-- 消息列表 -->
     <template v-if="messages.length > 0">
       <div 
@@ -20,11 +20,45 @@
         </div>
         <div class="message-wrapper">
           <div class="message-header">
-            <div class="message-sender">
-              {{ message.role === 'user' ? '你' : agentName || 'AI助手' }}
+            <div class="message-sender-info">
+              <div class="message-sender">
+                {{ message.role === 'user' ? '你' : agentName || 'AI助手' }}
+              </div>
+              <div class="message-time">
+                {{ formatDate(message.createdAt) }}
+              </div>
             </div>
-            <div class="message-time">
-              {{ formatDate(message.createdAt) }}
+            
+            <!-- 消息操作按钮 -->
+            <div class="message-actions" v-if="message.status === 'success' || message.status === 'error'">
+              <!-- 复制按钮：只在有内容时显示 -->
+              <n-button v-if="message.content"
+                        text
+                        class="tool-button"
+                        @click="copyMessage(message)">
+                <template #icon>
+                  <n-icon><CopyOutline /></n-icon>
+                </template>
+              </n-button>
+              
+              <!-- 重试按钮：仅AI消息显示 -->
+              <n-button v-if="message.role === 'assistant'" 
+                        text
+                        class="tool-button"
+                        @click="$emit('retry', index)">
+                <template #icon>
+                  <n-icon><RefreshOutline /></n-icon>
+                </template>
+              </n-button>
+              
+              <!-- 删除按钮：所有消息都显示 -->
+              <n-button text
+                        class="tool-button"
+                        @click="$emit('delete', index)">
+                <template #icon>
+                  <n-icon><TrashOutline /></n-icon>
+                </template>
+              </n-button>
             </div>
           </div>
           <div class="message-content">
@@ -35,10 +69,11 @@
                 <span class="dot"></span>
                 <span class="dot"></span>
               </div>
-              <!-- 显示正常内容 -->
+              <!-- 显示正常内容，添加key强制重渲染 -->
               <markdown-renderer 
                 v-else-if="message.role === 'assistant'" 
                 :content="message.content" 
+                :key="`md-${index}-${message.updatedAt || message.createdAt}`"
               />
               <n-text v-else>{{ message.content }}</n-text>
             </div>
@@ -47,12 +82,21 @@
                 <div class="custom-error-icon">
                   <n-icon><AlertCircleOutline /></n-icon>
                 </div>
-                <div class="custom-error-content">
-                  {{ message.content || '消息发送失败' }}
-                </div>
+                <pre class="custom-error-content" v-if="message.content && (message.content.startsWith('{') || message.content.startsWith('['))">{{ formatErrorMessage(message.content) }}</pre>
+                <div class="custom-error-content" v-else>{{ message.content || '消息发送失败' }}</div>
                 <div class="custom-error-action">
                   <n-button text @click="$emit('retry', index)">重试</n-button>
                 </div>
+              </div>
+            </div>
+            
+            <!-- 附件列表，仅在用户消息中显示 -->
+            <div v-if="message.role === 'user' && message.attachments && message.attachments.length > 0" class="file-list">
+              <div v-for="(attachment, idx) in message.attachments" :key="idx" class="file-tag">
+                <n-icon class="file-icon" :color="fileIconStore.getIconByFilename(attachment.name).color">
+                  <component :is="fileIconStore.getIconByFilename(attachment.name).icon" />
+                </n-icon>
+                <span class="file-name">{{ attachment.name }}</span>
               </div>
             </div>
           </div>
@@ -87,9 +131,25 @@ import { ref, onMounted, nextTick, watch } from 'vue';
 import { 
   NAvatar, NIcon, NButton, NText 
 } from 'naive-ui';
-import { ServerOutline, PersonOutline, AlertCircleOutline } from '@vicons/ionicons5';
+import { 
+  ServerOutline, PersonOutline, AlertCircleOutline,
+  RefreshOutline, TrashOutline, CopyOutline  // 添加复制图标
+} from '@vicons/ionicons5';
 import MarkdownRenderer from '../../../components/MarkdownRenderer.vue';
 import { ChatMessage } from '../../../services/typings';
+import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
+
+// 定义节流函数
+function throttle(fn: Function, delay: number) {
+  let lastCall = 0;
+  return function(...args: any[]) {
+    const now = Date.now();
+    if (now - lastCall >= delay) {
+      fn(...args);
+      lastCall = now;
+    }
+  };
+}
 
 // 定义props - 修改types
 const props = defineProps({
@@ -119,64 +179,85 @@ const props = defineProps({
   },
 });
 
-// 定义事件
-defineEmits(['retry', 'send']);
+// 定义事件 - 添加删除事件
+defineEmits(['retry', 'send', 'delete']);
 
 // DOM引用
 const messagesContainer = ref<HTMLElement | null>(null);
 
-// 消息时间格式化
-function formatDate(timesamp: number): string {
-  const date = new Date(timesamp);
-  return date.toLocaleDateString('zh-CN');
+// 改进的消息时间格式化
+function formatDate(timestamp: number): string {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  return date.toLocaleDateString('zh-CN', { 
+    hour: '2-digit', 
+    minute: '2-digit'
+  });
 }
 
-// 滚动到底部函数
-function scrollToBottom(immediate = false) {
-  if (messagesContainer.value) {
-    // 立即滚动一次
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    
-    if (!immediate) {
-      // 延迟再滚动两次，确保所有内容都已渲染
-      setTimeout(() => {
-        if (messagesContainer.value) {
-          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-        }
-      }, 200);
-      
-      setTimeout(() => {
-        if (messagesContainer.value) {
-          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-        }
-      }, 500);
+// 添加 JSON 格式化函数
+function formatErrorMessage(content: string): string {
+  if (!content) return '消息发送失败';
+  
+  try {
+    // 尝试解析 JSON
+    if (content.startsWith('{') || content.startsWith('[')) {
+      const jsonObj = JSON.parse(content);
+      return JSON.stringify(jsonObj, null, 2);
     }
+    return content;
+  } catch {
+    return content;
   }
 }
 
-// 监听图片加载完成事件
-function setupImageLoadListener() {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      const images = messagesContainer.value.querySelectorAll('img');
-      if (images.length > 0) {
-        images.forEach(img => {
-          if (!img.complete) {
-            img.onload = () => scrollToBottom();
-          }
-        });
-      }
+// 添加新的响应式变量用于跟踪滚动状态
+const isAtBottom = ref(true);
+const scrollThreshold = 100; // 距离底部多少像素内认为在底部
+const scrollContainer = ref<HTMLDivElement | null>(null);
+
+// 检查是否在底部的函数
+const checkIfAtBottom = () => {
+  if (!scrollContainer.value) return;
+  
+  const { scrollHeight, scrollTop, clientHeight } = scrollContainer.value;
+  isAtBottom.value = scrollHeight - scrollTop - clientHeight < scrollThreshold;
+};
+
+// 处理滚动事件
+const handleScroll = throttle(() => {
+  checkIfAtBottom();
+}, 100);
+
+// 优化的滚动到底部函数
+const scrollToBottom = () => {
+  if (!scrollContainer.value) return;
+  
+  // 使用requestAnimationFrame来优化性能
+  requestAnimationFrame(() => {
+    if (scrollContainer.value) {
+      scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
     }
   });
-}
+};
 
-// 监听消息变化，滚动到底部
-watch(() => props.messages.length, () => {
-  nextTick(() => {
-    scrollToBottom();
-    setupImageLoadListener();
-  });
-});
+// 监听消息列表变化
+watch(() => props.messages, (newMessages, oldMessages) => {
+  // 如果消息列表为空，无需滚动
+  if (!newMessages || newMessages.length === 0) return;
+  
+  // 只有在以下情况才滚动:
+  // 1. 用户已经在查看底部（isAtBottom为true）
+  // 2. 或者是有新消息添加（消息数量变多）
+  const hasNewMessage = !oldMessages || newMessages.length > oldMessages.length;
+
+  if (isAtBottom.value || hasNewMessage) {
+    // 使用nextTick确保DOM已更新
+    nextTick(() => {
+      scrollToBottom();
+    });
+  }
+}, { deep: true });
 
 // 监听agentIcon变化，强制重新渲染
 watch(() => props.agentIcon, () => {
@@ -200,6 +281,25 @@ onMounted(() => {
     });
   }
 });
+
+// 获取文件图标存储
+const fileIconStore = useFileIconStore();
+
+// 复制消息内容
+function copyMessage(message: ChatMessage) {
+  const text = message.content;
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      // 可以使用 naive-ui 的 message 来显示复制成功提示
+      // 但这需要引入 useMessage，这里使用简单的提示
+      const button = document.activeElement as HTMLElement;
+      if (button) {
+        button.classList.add('copied');
+        setTimeout(() => button.classList.remove('copied'), 2000);
+      }
+    })
+    .catch(err => console.error('复制失败:', err));
+}
 </script>
 
 <style scoped>
@@ -240,8 +340,61 @@ onMounted(() => {
 
 .message-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
+}
+
+.message-sender-info {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 消息操作按钮样式 */
+.message-actions {
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-item:hover .message-actions {
+  opacity: 1;
+}
+
+/* 工具按钮通用样式 */
+.tool-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.tool-button:hover {
+  color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.tool-button:active {
+  color: var(--primary-color-hover);
+  transform: scale(0.95);
+}
+
+.tool-button :deep(.n-icon) {
+  font-size: 16px;
+}
+
+.tool-button.copied {
+  color: #22c55e;
+}
+
+/* 移除旧的操作按钮样式 */
+.message-action-btn {
+  display: none;
 }
 
 .message-sender {
@@ -261,6 +414,11 @@ onMounted(() => {
   position: relative;
   width: 100%;
   background-color: transparent;
+}
+
+.message-text {
+  width: 100%;
+  overflow-x: auto;
 }
 
 /* 错误消息样式 */
@@ -284,6 +442,25 @@ onMounted(() => {
 .custom-error-content {
   flex: 1;
   padding: 0 4px;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.custom-error-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-error-content::-webkit-scrollbar-thumb {
+  background-color: rgba(229, 57, 53, 0.3);
+  border-radius: 2px;
+}
+
+.custom-error-content::-webkit-scrollbar-track {
+  background-color: transparent;
 }
 
 .custom-error-action {
@@ -376,7 +553,7 @@ onMounted(() => {
 /* 动图效果样式 */
 .loading-animation {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   align-items: center;
   justify-content: flex-start;
 }
@@ -404,5 +581,58 @@ onMounted(() => {
   40% {
     opacity: 1;
   }
+}
+
+/* 附件样式 - 与ChatInput组件中的样式保持一致 */
+.file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.file-tag {
+  display: flex;
+  align-items: center;
+  background-color: #f0f0f0;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #555;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-icon {
+  font-size: 14px;
+  margin-right: 4px;
+  color: #2080f0;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 移除旧的附件样式 */
+.attachments-list, .attachments-header, .attachments-items,
+.attachment-item, .attachment-icon, .attachment-info,
+.attachment-name, .attachment-meta {
+  display: none;
+}
+
+/* 防止嵌套公式和图表出现重复渲染 */
+.message-text :deep(.katex-block .katex-block),
+.message-text :deep(.mermaid-container .mermaid-container) {
+  display: none;
+}
+
+/* 修复消息列表中的Markdown样式 */
+.message-text :deep(.markdown-body) {
+  padding: 0;
+  background: none;
+  border: none;
 }
 </style>

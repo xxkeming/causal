@@ -219,6 +219,7 @@ mod tests {
             api_category: "openai".to_string(),
             url: "https://api.openai.com/v1".to_string(),
             api_key: Some("sk-test-key".to_string()),
+            stream: true,
             models: Some(vec![Model {
                 name: "gpt-3.5-turbo".to_string(),
                 tags: vec!["chat".to_string()],

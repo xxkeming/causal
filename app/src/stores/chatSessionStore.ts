@@ -26,22 +26,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
   }
 
   /**
-   * 获取所有会话
-   */
-  async function fetchAllSessions() {
-    loading.value = true;
-    try {
-      sessions.value = await api.getAllSessions();
-      return sessions.value;
-    } catch (error) {
-      console.error('Failed to fetch chat sessions:', error);
-      return [];
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
    * 根据ID获取会话
    */
   function getSessionById(id: number): ChatSession | undefined {
@@ -177,6 +161,17 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     try {
       // 使用已有的updateSession函数，只更新topic字段
       const success = await updateSession(sessionId, { topic: newTopic.trim() });
+
+      if (success) {
+        // 更新本地状态
+        const sessionIndex = sessions.value.findIndex(s => s.id === sessionId);
+        if (sessionIndex !== -1) {
+          sessions.value[sessionIndex].topic = newTopic.trim();
+        }
+
+        // 重新排序
+        sortSessions();
+      }
       return success;
     } catch (error) {
       console.error(`更新会话主题失败 (ID: ${sessionId}):`, error);
@@ -190,7 +185,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     initialized,
     recentSessions,
     initialize,
-    fetchAllSessions,
     getSessionById,
     getSessionsByAgentId,
     createNewSession,
