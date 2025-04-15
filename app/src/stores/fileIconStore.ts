@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
 import { markRaw } from 'vue';
 import { 
   DocumentTextOutline, // 默认文档

@@ -548,13 +548,12 @@
   }
 
   .agent-card {
-    height: 100%;
+    height: 180px; /* 固定卡片高度 */
     display: flex;
     flex-direction: column;
     overflow: hidden;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    min-height: 100px; /* 确保卡片有一个最小高度，保持美观 */
   }
 
   .agent-card:hover {
@@ -566,6 +565,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-bottom: 12px; /* 增加底部间距 */
   }
 
   .agent-card-title {
@@ -581,13 +581,17 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    height: 3em; /* 约等于两行文字的高度 */
+    flex: 1; /* 让描述区域自动填充剩余空间 */
+    font-size: 13px; /* 稍微减小字体大小 */
   }
 
   .agent-card-footer {
+    margin-top: auto; /* 将页脚推到底部 */
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
   }
 
   .agent-card-date {
@@ -727,5 +731,18 @@
   /* 暗色模式悬停效果 */
   html.dark .category-action-btn:hover {
     background-color: rgba(255, 255, 255, 0.1); /* 暗模式下悬停背景 */
+  }
+
+  /* 添加响应式布局 */
+  @media (max-width: 1400px) {
+    .n-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  }
+
+  @media (max-width: 1100px) {
+    .n-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+
+  @media (max-width: 768px) {
+    .n-grid { grid-template-columns: repeat(1, 1fr) !important; }
   }
   </style>

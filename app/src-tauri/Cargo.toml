@@ -23,7 +23,7 @@ tauri-plugin-opener = "2"
 
 tokio = { version = "1", features = ["full"] }
 futures = "*"
-async-openai = "0.28.0"
+rig-core = { path = "../../../ai-test/rig/rig-core", features = ["all", "mcp"] }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -47,6 +47,7 @@
           class="session-item"
           :class="{ active: currentSessionId === session.id }"
           @click="switchSession(session.id)"
+          @contextmenu="handleContextMenu($event, session)"
         >
           <!-- 添加智能体图标 -->
           <div class="session-icon">
@@ -64,32 +65,18 @@
           <div class="session-info">
             <div class="session-preview">{{ session.topic }}</div>
           </div>
-          <div class="session-actions">
-            <!-- 添加编辑按钮 -->
-            <n-button
-              circle 
-              tertiary 
-              size="tiny"
-              @click.stop="openEditSessionModal(session)"
-              class="session-action-btn"
-            >
-              <template #icon>
-                <n-icon><CreateOutline /></n-icon>
-              </template>
-            </n-button>
-            
-            <n-button 
-              circle 
-              tertiary 
-              size="tiny"
-              @click.stop="confirmDeleteSession(session.id)"
-            >
-              <template #icon>
-                <n-icon size="14"><TrashOutline /></n-icon>
-              </template>
-            </n-button>
-          </div>
         </div>
+
+        <!-- 添加右键菜单 -->
+        <n-dropdown
+          :show="showDropdown"
+          :options="menuOptions"
+          :x="x"
+          :y="y"
+          placement="bottom-start"
+          @select="handleSelect"
+          @clickoutside="showDropdown = false"
+        />
         
         <div v-if="filteredSessions.length === 0" class="no-sessions">
           {{ sessions.length === 0 ? '暂无会话记录' : '没有找到匹配的会话' }}
@@ -147,9 +134,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { NLayoutSider, NIcon, NButton, NScrollbar, NAvatar, NModal, NInput, NTooltip } from 'naive-ui';
-import { AddOutline, TrashOutline, ServerOutline, WarningOutline, SearchOutline, CreateOutline } from '@vicons/ionicons5';
+import { computed, ref, nextTick, h } from 'vue';
+import { NLayoutSider, NIcon, NButton, NScrollbar, NAvatar, NModal, NInput, NTooltip, NDropdown } from 'naive-ui';
+import { AddOutline, TrashOutline, ServerOutline, WarningOutline, SearchOutline, CreateOutline, CopyOutline } from '@vicons/ionicons5';
 import { ChatSession } from '../../../services/typings';
 import { useIconStore } from '../../../stores/iconStore';
 import { useAgentStore } from '../../../stores/agentStore';
@@ -165,7 +152,7 @@ const props = defineProps<{
 // 事件
 const emit = defineEmits<{
   'update:collapsed': [value: boolean];
-  'create': [];
+  'create': [agentId: number]; // 修改为必须传递agentId
   'switch': [sessionId: number];
   'delete': [sessionId: number];
 }>();
@@ -181,7 +168,7 @@ const collapsedValue = computed({
 });
 
 // 事件处理函数
-const createNewSession = () => emit('create');
+const createNewSession = () => emit('create', 0); // 传递0表示新建会话时需要选择智能体
 const switchSession = (sessionId: number) => emit('switch', sessionId);
 const deleteSession = (sessionId: number) => emit('delete', sessionId);
 
@@ -293,6 +280,65 @@ async function updateSessionName() {
     editLoading.value = false;
   }
 }
+
+// 添加右键菜单配置
+const menuOptions = [
+  {
+    label: '新对话',
+    key: 'copy',
+    icon: () => h(NIcon, null, { default: () => h(CopyOutline) })
+  },
+  {
+    label: '编辑',
+    key: 'edit',
+    icon: () => h(NIcon, null, { default: () => h(CreateOutline) })
+  },
+  {
+    label: '删除',
+    key: 'delete',
+    icon: () => h(NIcon, null, { default: () => h(TrashOutline) })
+  }
+];
+
+// 右键菜单显示位置
+const x = ref(0);
+const y = ref(0);
+const showDropdown = ref(false);
+const selectedSessionId = ref<number | null>(null);
+
+// 处理右键菜单
+const handleContextMenu = (e: MouseEvent, session: ChatSession) => {
+  e.preventDefault();
+  selectedSessionId.value = session.id;
+  showDropdown.value = false;
+  nextTick().then(() => {
+    x.value = e.clientX;
+    y.value = e.clientY;
+    showDropdown.value = true;
+  });
+};
+
+// 处理菜单选择 - 修改复制逻辑
+const handleSelect = (key: string) => {
+  if (!selectedSessionId.value) return;
+  
+  const originalSession = props.sessions.find(s => s.id === selectedSessionId.value);
+  if (!originalSession) return;
+  
+  switch (key) {
+    case 'edit':
+      openEditSessionModal(originalSession);
+      break;
+    case 'copy':
+      emit('create', originalSession.agentId); // 直接使用原会话的agentId
+      break;
+    case 'delete':
+      confirmDeleteSession(selectedSessionId.value);
+      break;
+  }
+  showDropdown.value = false;
+};
+
 </script>
 
 <style scoped>
@@ -396,7 +442,7 @@ async function updateSessionName() {
 .session-info {
   flex: 1;
   min-width: 0;
-  padding-right: 24px; /* 为操作按钮留空间 */
+  padding-right: 8px;
 }
 
 .session-preview {
@@ -406,16 +452,13 @@ async function updateSessionName() {
   white-space: nowrap;
 }
 
+/* 移除旧的操作按钮样式 */
 .session-actions {
-  visibility: hidden;
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
+  display: none;
 }
 
-.session-item:hover .session-actions {
-  visibility: visible;
+.session-action-btn {
+  display: none;
 }
 
 .no-sessions {
@@ -432,7 +475,7 @@ async function updateSessionName() {
 /* 添加靠上显示的样式 */
 :deep(.n-modal-container) {
   margin-top: 8vh !important;
-  align-items: flex-start !important;
+  align-items: flex-start;
 }
 
 :deep(.n-modal-body-wrapper) {

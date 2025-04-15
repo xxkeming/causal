@@ -7,7 +7,7 @@
         :sessions="chatSessionStore.sessions"
         :current-session-id="currentSessionId"
         v-model:collapsed="siderCollapsed"
-        @create="openAgentSelectorForNewSession"
+        @create="createSessionDirectly"
         @switch="switchSession"
         @delete="deleteSession"
       />
@@ -44,6 +44,7 @@
           <!-- 使用拆分出的输入组件 -->
           <chat-input 
             :loading="loading"
+            v-model:stream="stream"
             @send="sendMessage"
           />
         </template>
@@ -124,6 +125,7 @@ const messages = ref<ChatMessage[]>([]);
 const agent = ref<Agent | null>(null);
 const loading = ref(false);
 const siderCollapsed = ref(false);
+const stream = ref(true); // 添加stream状态
 
 // 计算属性
 const hasActiveSession = computed(() => 
@@ -284,7 +286,7 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
     loading.value = true;
 
     // 模拟流式输出，将文件信息传递给API
-    await chatEvent(agentId, sessionId, messageId, async (event: MessageEvent) => {
+    await chatEvent(agentId, sessionId, messageId, stream.value, async (event: MessageEvent) => {
       switch (event.event) {
         case 'started':
           console.log('started');
@@ -395,12 +397,9 @@ function closeSession() {
   currentSessionId.value = null;
   currentSession.value = null;
   messages.value = [];
-}
 
-// 会话管理
-function openAgentSelectorForNewSession() {
-  // 显示智能体选择器
-  agentSelectorVisible.value = true;
+  // 对话关闭, 侧边栏要打开
+  siderCollapsed.value = false;
 }
 
 // 切换会话
@@ -574,6 +573,49 @@ async function createSessionWithAgent(selectedAgent: Agent) {
 // 导航到创建智能体页面
 function navigateToCreateAgent() {
   router.push('/agents');
+}
+
+// 改为根据agentId创建会话
+async function createSessionDirectly(agentId: number) {
+  // 如果agnetId === 0, 显示智能体选择器
+  if (agentId === 0) {
+    agentSelectorVisible.value = true;
+    return;
+  }
+  
+  // 如果agentId不为0, 创建会话
+  try {
+    loading.value = true;
+    
+    // 获取智能体信息用于创建会话标题
+    const selectedAgent = await agentStore.fetchAgentById(agentId);
+    if (!selectedAgent) {
+      message.error('找不到对应的智能体');
+      return;
+    }
+    
+    // 创建带时间戳的会话名称
+    const timestamp = new Date().toLocaleString('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric'
+    });
+    const sessionTitle = `与${selectedAgent.name}的对话 (${timestamp})`;
+    
+    // 创建新会话
+    const newSession = await chatSessionStore.createNewSession(agentId, sessionTitle);
+    
+    // 切换到新会话
+    await switchSession(newSession.id);
+    
+    message.success('创建会话成功');
+  } catch (error) {
+    console.error('创建会话失败:', error);
+    message.error('创建会话失败');
+  } finally {
+    loading.value = false;
+  }
 }
 
 // 初始化 - 修改为不依赖URL参数

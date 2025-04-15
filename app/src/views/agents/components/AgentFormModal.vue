@@ -194,55 +194,7 @@
               </div>
             </n-form-item>
         
-            <n-form-item>
-              <template #label>
-                <div class="label-with-help">
-                  <n-popover trigger="hover" placement="top">
-                    <template #trigger>
-                      <n-icon size="16" class="help-icon">
-                        <HelpCircleOutline />
-                      </n-icon>
-                    </template>
-                      <span class="popover-content">核采样: 控制词汇选择的广度。较低的值使模型只选择最可能的词汇，较高的值让模型考虑更多可能性。</span>
-                  </n-popover>
-                  <span style="margin-left: 8px;">Top P</span>
-                </div>
-              </template>
-              <n-slider
-                v-model:value="formModel.topP"
-                :min="0"
-                :max="1"
-                :step="0.05"
-                :tooltip="true"
-                :style="{ width: '400px' }"
-              />
-              <div class="value-display">{{ formModel.topP.toFixed(2) }}</div>
-            </n-form-item>
-        
-            <n-form-item>
-              <template #label>
-                <div class="label-with-help">
-                  <n-popover trigger="hover" placement="top">
-                    <template #trigger>
-                      <n-icon size="16" class="help-icon">
-                        <HelpCircleOutline />
-                      </n-icon>
-                    </template>
-                    <div class="popover-content">生成的回复中包含的 token 数量，控制生成内容的词汇多样性。较高的值会考虑更多可能的词汇，增加回复的多样性。</div>
-                  </n-popover>
-                  <span style="margin-left: 8px;">Top K</span>
-                </div>
-              </template>
-              <div class="form-item-row">
-                <n-input-number
-                  v-model:value="formModel.topK"
-                  :min="0"
-                  :max="100"
-                  :step="5"
-                  :style="{ width: '160px' }"
-                />
-              </div>
-            </n-form-item>
+            <!-- 删除 topP 和 topK 表单项 -->
         
             <n-form-item>
               <template #label>
@@ -476,8 +428,6 @@ const formModel = reactive<{
   model?: ProviderModel;
   prompt: string;
   temperature: number;
-  topP: number;
-  topK: number; // 添加 topK 属性
   maxTokens: number;
   contextSize: number;
   tools: number[];
@@ -489,8 +439,6 @@ const formModel = reactive<{
   iconId: 0, // 将 avatarId 改为 iconId
   prompt: '',
   temperature: 0.7,
-  topP: 1.0,
-  topK: 60, // 添加 topK 默认值
   maxTokens: 0,
   contextSize: 5,
   tools: [],
@@ -681,13 +629,11 @@ watch(() => props.visible, (visible) => {
     // 重置表单
     formModel.name = '';
     formModel.description = '';
-    formModel.categoryId = -1;
+    formModel.categoryId = null;
     formModel.iconId = 0;
     formModel.model = undefined;
     formModel.prompt = '';
     formModel.temperature = 0.7;
-    formModel.topP = 1.0;
-    formModel.topK = 60;
     formModel.maxTokens = 0;
     formModel.contextSize = 5;
     formModel.tools = [];
@@ -710,8 +656,6 @@ watch(() => props.visible, (visible) => {
     formModel.model = props.agentData.model;
     formModel.prompt = props.agentData.prompt || '';
     formModel.temperature = props.agentData.temperature;
-    formModel.topP = props.agentData.topP;
-    formModel.topK = props.agentData.topK;
     formModel.maxTokens = props.agentData.maxTokens;
     formModel.contextSize = props.agentData.contextSize;
     formModel.tools = props.agentData.tools || [];

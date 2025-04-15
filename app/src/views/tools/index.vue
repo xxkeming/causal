@@ -559,14 +559,13 @@ onBeforeUnmount(() => {
 }
 
 .tool-card {
-  height: 100%;
+  height: 180px; /* 固定卡片高度 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  min-height: 200px;
-  position: relative; /* 添加相对定位用于标签定位 */
+  position: relative;
 }
 
 .tool-card:hover {
@@ -577,8 +576,8 @@ onBeforeUnmount(() => {
 /* 工具类型标签样式 */
 .tool-type-tag {
   position: absolute;
-  top: 0px;
-  right: 0px;
+  top: 8px;
+  right: 8px;
   z-index: 1;
 }
 
@@ -586,6 +585,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .tool-card-title {
@@ -601,13 +601,17 @@ onBeforeUnmount(() => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  height: 3em; /* 约等于两行文字的高度 */
+  flex: 1;
+  font-size: 13px;
 }
 
 .tool-card-footer {
+  margin-top: auto;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .tool-card-date {
@@ -743,6 +747,19 @@ html.dark .category-action-btn:hover {
   .tools-search {
     width: 100%;
   }
+}
+
+/* 响应式布局 */
+@media (max-width: 1400px) {
+  .n-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
+@media (max-width: 1100px) {
+  .n-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 768px) {
+  .n-grid { grid-template-columns: repeat(1, 1fr) !important; }
 }
 
 </style>

@@ -5,8 +5,8 @@
       <div class="content-section">
         <div class="app-info-section">
           <div class="app-logo">
-            <!-- 替换占位符为实际logo.svg -->
-            <img src="/logo.svg" alt="AI Test Logo" class="logo-image" />
+            <!-- 替换占位符为实际logo.png -->
+            <img src="/logo.png" alt="AI Test Logo" class="logo-image" />
           </div>
           <div class="app-details">
             <h2>AI Test</h2>

@@ -38,8 +38,6 @@ export const mockAgents: Agent[] = [
     },
     prompt: "你是一个专业的文档编辑助手。你会帮助用户改进文档内容，提供修改建议，纠正语法错误，优化文档结构。请保持专业、简洁的沟通风格。",
     temperature: 0.7,
-    topP: 1.0,
-    topK: 50,
     maxTokens: 2000,
     contextSize: 8,
     params: [
@@ -64,8 +62,6 @@ export const mockAgents: Agent[] = [
     },
     prompt: "你是一个数据分析专家。你擅长分析各类数据，提取洞察，并以清晰的方式呈现结果。请在回答中使用专业的数据分析术语，并尽可能提供可视化建议。",
     temperature: 0.5,
-    topP: 0.9,
-    topK: 40,
     maxTokens: 4000,
     contextSize: 10,
     params: [
@@ -95,8 +91,6 @@ export const mockAgents: Agent[] = [
     },
     prompt: "你是一个富有创造力的写作助手。你擅长创作引人入胜的故事、富有感染力的诗歌和其他创意内容。请使用生动、丰富的语言，根据用户的需求提供创意帮助。",
     temperature: 1.2,
-    topP: 1.0,
-    topK: 80,
     maxTokens: 3000,
     contextSize: 6,
     params: [
@@ -126,8 +120,6 @@ export const mockAgents: Agent[] = [
     },
     prompt: "你是一个会议记录助手。你的任务是帮助用户整理会议内容，提取关键信息，组织成结构化的会议纪要。请使用简洁、清晰的格式，重点突出重要决策和后续行动项。",
     temperature: 0.4,
-    topP: 0.8,
-    topK: 30,
     maxTokens: 2500,
     contextSize: 12,
     params: [
@@ -152,8 +144,6 @@ export const mockAgents: Agent[] = [
     },
     prompt: "你是一个专业的编程助手。你会帮助用户解决编程问题、编写代码、解释技术概念，并提供最佳实践建议。请使用正确的代码格式，并在必要时提供详细的解释。",
     temperature: 0.5,
-    topP: 0.9,
-    topK: 40,
     maxTokens: 4000,
     contextSize: 15,
     params: [

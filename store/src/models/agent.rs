@@ -59,11 +59,6 @@ pub struct Agent {
     /// 生成文本的随机程度(0-2)
     pub temperature: f64,
     /// 词汇多样性(0-1)
-    #[serde(rename = "topP")]
-    pub top_p: f64,
-    /// Token数量，值越大回复内容越多
-    #[serde(rename = "topK")]
-    pub top_k: u32,
     /// 最大消息长度，0表示不限制
     #[serde(rename = "maxTokens")]
     pub max_tokens: u32,

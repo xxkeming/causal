@@ -24,9 +24,6 @@ export interface Provider {
   url: string;
   apiKey?: string;
 
-  // 是否流式调用
-  stream: boolean;
-
   models?: Model[];
 }
 
@@ -71,14 +68,6 @@ export interface Agent {
   // 模型生成文本的随机程度。值越大，回复内容越赋有多样性、创造性、随机性；设为 0 根据事实回答。日常聊天建议设置为 0.7
   // 默认1, 0 - 2
   temperature: number;
-
-  // 值越小，AI 生成的内容越单调，也越容易理解；值越大，AI 回复的词汇围越大，越多样化
-  // 默认1, 0 - 1
-  topP: number;
-
-  // 生成的回复中包含的 token 数量，值越大，回复内容越多，但可能会变得不连贯
-  // 默认60
-  topK: number;
 
   // 最大消息长度, 默认0, 0 不限制
   maxTokens: number;

@@ -1,13 +1,10 @@
 use crate::error;
-use async_openai::{
-    config::OpenAIConfig,
-    types::{
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        CreateChatCompletionRequest, CreateChatCompletionRequestArgs,
-    },
-    Client,
-};
+
 use futures::StreamExt;
+use rig::{
+    completion::Prompt,
+    streaming::{StreamingChoice, StreamingPrompt},
+};
 use serde::Serialize;
 
 #[derive(Clone, Serialize)]
@@ -19,21 +16,32 @@ pub enum MessageEvent {
 }
 
 async fn event_chat_stream(
-    client: Client<OpenAIConfig>, request: CreateChatCompletionRequest,
+    agent: rig::agent::Agent<rig::providers::openai::CompletionModel>, prompt: String,
     on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
-    let mut stream = client.chat().create_stream(request).await?;
+    let mut stream = agent.stream_prompt(&prompt).await?;
 
     on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
 
-    while let Some(result) = stream.next().await {
-        let response = result?;
-        for chat_choice in response.choices {
-            if let Some(content) = chat_choice.delta.content {
-                // write!(lock, "{}", content).unwrap();
+    while let Some(chunk) = stream.next().await {
+        match chunk {
+            Ok(StreamingChoice::Message(content)) => {
+                print!("{}", content);
                 on_event
                     .send(MessageEvent::Progress { content })
                     .map_err(|_| error::Error::Unknown)?;
+            }
+            Ok(StreamingChoice::ToolCall(name, _, params)) => {
+                let res = agent
+                    .tools
+                    .call(&name, params.to_string())
+                    .await
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
+                println!("\nResult: {}", res);
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                break;
             }
         }
     }
@@ -46,17 +54,15 @@ async fn event_chat_stream(
 }
 
 async fn event_chat(
-    client: Client<OpenAIConfig>, request: CreateChatCompletionRequest,
+    agent: rig::agent::Agent<rig::providers::openai::CompletionModel>, prompt: String,
     on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
-    let response = client.chat().create(request).await?;
-
     on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
-    for chat_choice in response.choices {
-        if let Some(content) = chat_choice.message.content {
-            on_event.send(MessageEvent::Progress { content }).map_err(|_| error::Error::Unknown)?;
-        }
-    }
+
+    let content = agent.prompt(prompt).await?;
+
+    on_event.send(MessageEvent::Progress { content }).map_err(|_| error::Error::Unknown)?;
+
     on_event.send(MessageEvent::Finished).map_err(|_| error::Error::Unknown)?;
 
     Ok(serde_json::json!({
@@ -66,7 +72,7 @@ async fn event_chat(
 
 pub async fn event(
     store: tauri::State<'_, store::Store>, agent_id: u64, _session_id: u64, message_id: u64,
-    on_event: tauri::ipc::Channel<MessageEvent>,
+    stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
     let Some(agent) = store.get_agent(agent_id)? else {
         return Err(error::Error::InvalidData(format!("Agent with id {agent_id} not found")));
@@ -91,45 +97,35 @@ pub async fn event(
         )));
     };
 
-    let content = match message.attachments {
-        Some(attachments) => {
-            let mut content = message.content;
-            for attachment in attachments {
-                content.push_str(&format!(
-                    "\n\n<attachment><name>{}</name><data>{}</data></attachment>",
-                    attachment.name, attachment.data
-                ));
-            }
-            content
+    let client = rig::providers::openai::Client::from_url(
+        provider.api_key.as_ref().unwrap_or(&"".to_string()),
+        &provider.url,
+    );
+
+    let client = client.agent(&model.name).temperature(agent.temperature);
+
+    let client =
+        if agent.max_tokens > 0 { client.max_tokens(agent.max_tokens as u64) } else { client };
+
+    let client = if agent.prompt.len() > 0 { client.preamble(&agent.prompt) } else { client };
+
+    // 添加附件 client.context(doc)
+    let client = if let Some(attachments) = message.attachments {
+        let mut contexts = String::new();
+        for attachment in attachments {
+            contexts.push_str(&format!(
+                "\n\n<attachment><name>{}</name><data>{}</data></attachment>",
+                attachment.name, attachment.data
+            ));
         }
-        None => message.content,
+        client.context(&contexts)
+    } else {
+        client
     };
 
-    // println!("Message: {:?}", content);
-
-    let config = async_openai::config::OpenAIConfig::new()
-        .with_api_base(provider.url.clone())
-        .with_api_key(provider.api_key.map(|key| key.to_string()).unwrap_or_default());
-
-    let client = Client::with_config(config);
-
-    let request = CreateChatCompletionRequestArgs::default()
-        .model(model.name.clone())
-        // .max_tokens(agent.max_tokens)
-        .temperature(agent.temperature as f32)
-        .top_p(agent.top_p as f32)
-        .messages([
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(agent.prompt.clone())
-                .build()?
-                .into(),
-            ChatCompletionRequestUserMessageArgs::default().content(content).build()?.into(),
-        ])
-        .build()?;
-
-    if provider.stream {
-        event_chat_stream(client, request, on_event).await
+    if stream {
+        event_chat_stream(client.build(), message.content, on_event).await
     } else {
-        event_chat(client, request, on_event).await
+        event_chat(client.build(), message.content, on_event).await
     }
 }

@@ -11,14 +11,23 @@ async fn fetch(
 #[tauri::command]
 async fn event(
     store: tauri::State<'_, store::Store>, agent: u64, session: u64, message: u64,
-    on_event: tauri::ipc::Channel<api::event::MessageEvent>,
+    on_event: tauri::ipc::Channel<api::event::MessageEvent>, stream: bool,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::event::event(store, agent, session, message, on_event).await.map_err(|e| e.into())
+    api::event::event(store, agent, session, message, stream, on_event).await.map_err(|e| e.into())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
-    let store = store::Store::open("store-tmp").unwrap();
+    // 获取当前用户的目录, 拼接.causal, 如果没有则创建
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| {
+        std::env::var("USERPROFILE").unwrap_or_else(|_| std::env::var("HOMEPATH").unwrap())
+    });
+    let causal_dir = format!("{}/.causal", home_dir);
+    if !std::path::Path::new(&causal_dir).exists() {
+        std::fs::create_dir_all(&causal_dir).unwrap();
+    }
+
+    let store = store::Store::open(format!("{}/store", causal_dir)).unwrap();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

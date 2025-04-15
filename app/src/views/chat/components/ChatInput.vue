@@ -52,6 +52,24 @@
 
         <!-- 右侧发送按钮 -->
         <div class="toolbar-right">
+          <!-- 替换开关为图标按钮 -->
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                text
+                :class="streamButtonClass"
+                @click="$emit('update:stream', !props.stream)"
+              >
+                <template #icon>
+                  <n-icon>
+                    <component :is="props.stream ? FlashOutline : FlashOffOutline" />
+                  </n-icon>
+                </template>
+              </n-button>
+            </template>
+            {{ props.stream ? '流式输出已开启' : '流式输出已关闭' }}
+          </n-tooltip>
+          
           <n-button 
             class="tool-button" 
             text
@@ -73,15 +91,24 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { NInput, NButton, NIcon, NTooltip, useMessage } from 'naive-ui';
-import { SendOutline, AttachOutline, CloseCircleOutline, PauseCircleOutline } from '@vicons/ionicons5';
+import { 
+  SendOutline, 
+  AttachOutline, 
+  CloseCircleOutline, 
+  PauseCircleOutline,
+  FlashOutline, // 添加流式输出图标
+  FlashOffOutline // 添加非流式输出图标
+} from '@vicons/ionicons5';
 import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
 
 const props = defineProps<{
   loading: boolean;
+  stream?: boolean; // 添加stream属性
 }>();
 
 const emit = defineEmits<{
   (e: 'send', text: string, files?: File[]): void;
+  (e: 'update:stream', value: boolean): void;
 }>();
 
 const inputMessage = ref('');
@@ -96,6 +123,13 @@ const canSendMessage = computed(() =>
   (inputMessage.value.trim() !== '' || selectedFiles.value.length > 0) && 
   !props.loading
 );
+
+// 流式输出按钮样式类计算
+const streamButtonClass = computed(() => ({
+  'tool-button': true,
+  'stream-active': props.stream,
+  'stream-inactive': !props.stream
+}));
 
 // 触发文件选择对话框
 function triggerFileInput() {
@@ -244,7 +278,7 @@ function handleSendOrStop() {
 /* 移除可能限制高度的设置，允许文本框自由扩展 */
 .chat-input :deep(.n-input__textarea),
 .chat-input :deep(.n-input-wrapper) {
-  max-height: none !important;
+  max-height: none;
 }
 
 /* 工具栏按钮通用样式 - 同时应用于附件和发送按钮 */
@@ -417,5 +451,20 @@ function handleSendOrStop() {
 .file-icon {
   font-size: 14px;
   margin-right: 4px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 流式输出按钮样式 */
+.stream-active {
+  color: var(--primary-color) !important;
+}
+
+.stream-inactive {
+  color: #999 !important;
 }
 </style>
