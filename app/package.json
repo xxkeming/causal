@@ -15,7 +15,7 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.36.4",
     "@tauri-apps/api": "^2.3.0",
-    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-opener": "^2.2.6",
     "@types/katex": "^0.16.7",
     "@vicons/ionicons5": "^0.13.0",
     "highlight": "^0.2.4",

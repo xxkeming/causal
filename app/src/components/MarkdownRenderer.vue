@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-body" v-html="renderedContent"></div>
+  <div class="markdown-body" v-html="renderedContent" @click="handleLinkClick"></div>
 </template>
 
 <script setup lang="ts">
@@ -11,6 +11,8 @@ import mermaid from 'mermaid';
 
 import 'katex/dist/katex.min.css';
 
+import { openInUrl } from '../services/api';
+
 // 组件接口定义
 interface Props {
   content: string;
@@ -18,6 +20,19 @@ interface Props {
 
 const props = defineProps<Props>();
 const renderedContent = ref<string>('');
+
+// 添加链接点击处理函数
+// 把target=_blank
+const handleLinkClick = async (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (target.tagName === 'A') {
+    event.preventDefault();
+    const href = target.getAttribute('href');
+    if (href) {
+      await openInUrl(href);
+    }
+  }
+};
 
 // 初始化markdown-it实例，添加类型注解
 const md: MarkdownIt = new MarkdownIt({
@@ -58,6 +73,21 @@ const md: MarkdownIt = new MarkdownIt({
     // 优化代码块结构，移除多余的空白字符
     return `<div class="code-block"><div class="code-header"><span class="code-language">${lang || 'plaintext'}</span><button class="code-copy-btn" title="复制代码" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(str)}')); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000);"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="check-icon"><polyline points="20 6 9 17 4 12"></polyline></svg></button></div><pre class="hljs"><code>${highlightedCode}</code></pre></div>`;
   }
+}).use((md) => {
+  // 修改链接渲染规则
+  const defaultRender = md.renderer.rules.link_open || function(tokens, idx, options, _env, self) {
+    return self.renderToken(tokens, idx, options);
+  };
+
+  md.renderer.rules.link_open = function(tokens, idx, options, env, self) {
+    // 为外部链接添加 target="_blank" 和 rel="noopener noreferrer"
+    const token = tokens[idx];
+    const href = token.attrGet('href');
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      token.attrPush(['class', 'external-link']);
+    }
+    return defaultRender(tokens, idx, options, env, self);
+  };
 });
 
 // 初始化 Mermaid
@@ -1023,5 +1053,22 @@ onMounted(() => {
 .markdown-body :deep(.thinking-content .katex-display) {
   text-align: left;
   margin: 0.25em 0;
+}
+
+/* 添加外部链接样式 */
+.markdown-body :deep(.external-link) {
+  cursor: pointer;
+  /* 可选：添加一个小图标表示外部链接 */
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>');
+  background-position: right 2px center;
+  background-repeat: no-repeat;
+  background-size: 12px;
+  padding-right: 17px;
+}
+
+/* 链接悬停效果 */
+.markdown-body :deep(.external-link:hover) {
+  text-decoration: underline;
+  opacity: 0.8;
 }
 </style>

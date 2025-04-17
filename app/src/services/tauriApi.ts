@@ -1,4 +1,5 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
+import { openPath, openUrl } from '@tauri-apps/plugin-opener';
 
 interface Response {
   status: string;
@@ -72,6 +73,14 @@ export async function event_local(agentId: number, sessionId: number, messageId:
     console.error('Failed to call event_local function:', error);
     throw error;
   }
+}
+
+export async function openInPath(path: string) {
+  await openPath(path);
+}
+
+export async function openInUrl(url: string) {
+  await openUrl(url);
 }
 
 /**

@@ -17,6 +17,10 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     loading.value = true;
     try {
       sessions.value = await api.getAllSessions();
+
+      // 重新排序
+      sortSessions();
+      
       initialized.value = true;
     } catch (error) {
       console.error('Failed to initialize chat sessions:', error);

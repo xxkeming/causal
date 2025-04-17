@@ -9,11 +9,8 @@ pub enum Error {
     #[error("Invalid data: {0}")]
     InvalidData(String),
 
-    #[error("Rig error: {0}")]
-    RigCompletion(#[from] rig::completion::request::CompletionError),
-
-    #[error("Rig error: {0}")]
-    RigPrompt(#[from] rig::completion::PromptError),
+    #[error("openai error: {0}")]
+    OpenAI(#[from] async_openai::error::OpenAIError),
 
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),

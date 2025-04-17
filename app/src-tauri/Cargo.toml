@@ -23,7 +23,7 @@ tauri-plugin-opener = "2"
 
 tokio = { version = "1", features = ["full"] }
 futures = "*"
-rig-core = { workspace = true }
+async-openai = "0.28.1"
 
 serde = { workspace = true }
 serde_json = { workspace = true }

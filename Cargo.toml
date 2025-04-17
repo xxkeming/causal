@@ -10,8 +10,6 @@ members = ["app/src-tauri", "store", "tools"]
 # default-members = ["app"]
 
 [workspace.dependencies]
-rig-core = { path = "../ai-test/rig/rig-core", features = ["all", "mcp"] }
-
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

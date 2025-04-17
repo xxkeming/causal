@@ -363,6 +363,8 @@ export async function chatEvent(agentId: number, sessionId: number, messageId: n
 }
 
 // 导出Tauri相关API
+export const openInPath = tauriApi.openInPath;
+export const openInUrl = tauriApi.openInUrl;
 export const isTauriAvailable = tauriApi.isTauriAvailable;
 export const safeTauriCall = tauriApi.safeTauriCall;
 export type MessageEvent = tauriApi.MessageEvent;
