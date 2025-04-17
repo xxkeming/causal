@@ -234,6 +234,24 @@ pub fn ftech(
             store.delete_messages_by_session(id)?;
             Ok(serde_json::json!({ "status": "success" }))
         }
+        "file.convert" => {
+            let path: String = serde_json::from_str(data)?;
+            let path = std::path::Path::new(&path);
+            if path.is_file() {
+                let mut pandoc = pandoc::new();
+                pandoc.add_input(path);
+                pandoc.set_output(pandoc::OutputKind::Pipe);
+                pandoc.set_output_format(pandoc::OutputFormat::Markdown, Vec::new());
+
+                if let Ok(pandoc::PandocOutput::ToBuffer(data)) = pandoc.execute() {
+                    return Ok(serde_json::json!({ "status": "success", "data": data }));
+                }
+            }
+            return Ok(serde_json::json!({
+                "status": "error",
+                "message": "not a file"
+            }));
+        }
         _ => Err(error::Error::Unknown),
     }
 }

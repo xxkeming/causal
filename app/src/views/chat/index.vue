@@ -80,13 +80,13 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
-  NLayout, useMessage
+  NLayout, useMessage, useDialog // 添加 useDialog
 } from 'naive-ui';
 import { Agent, ChatMessage, ChatSession, Attachment } from '../../services/typings';
 import { useAgentStore } from '../../stores/agentStore';
 import { useIconStore } from '../../stores/iconStore';
 import { useChatSessionStore } from '../../stores/chatSessionStore';
-import { chatEvent, MessageEvent  } from '../../services/api';
+import { chatEvent, MessageEvent, convertFile  } from '../../services/api';
 import * as api from '../../services/api';
 
 // 导入组件
@@ -111,6 +111,7 @@ const selectedModelValue = ref<string | undefined>(undefined);
 // 路由和消息
 const router = useRouter();
 const message = useMessage();
+const dialog = useDialog(); // 在 setup 中添加 dialog
 
 // Store
 const agentStore = useAgentStore();
@@ -208,9 +209,21 @@ function addMessage(message: ChatMessage) {
   }
 }
 
+// 添加滚动到底部的辅助函数
+function scrollToBottom() {
+  nextTick(() => {
+    const chatMessages = document.querySelector('.chat-messages');
+    if (chatMessages) {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  });
+}
+
 // 发送消息
 async function sendMessage(text: string, files?: File[]) {
   if ((!text && (!files || files.length === 0)) || loading.value) return;
+
+  await convertFile("/Users/keming/Downloads/aaa.docx");
 
   if (agent.value === null) {
     message.error('请先选择智能体');
@@ -258,6 +271,7 @@ async function sendMessage(text: string, files?: File[]) {
     // 通过API添加用户消息
     const savedUserMessage = await api.addMessage(userMessage);
     addMessage(savedUserMessage);
+    scrollToBottom(); // 用户消息添加后滚动
 
     // 添加助手消息
     const assistantMessage = {
@@ -272,6 +286,8 @@ async function sendMessage(text: string, files?: File[]) {
     // 通过API添加助手初始消息
     const savedAssistantMessage = await api.addMessage(assistantMessage);
     addMessage(savedAssistantMessage);
+    scrollToBottom(); // 助手消息添加后滚动
+
     const assistantIndex = messages.value.findIndex(msg => msg.id === savedAssistantMessage.id);
 
     // 将文件信息传递给API
@@ -296,18 +312,32 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
           break;
         case 'finished':
           // 要等到流式输出完成后再更新最终状态
-          console.log('finished');
-          console.log(messages.value[assistantIndex].content);
           messages.value[assistantIndex].status = 'success';
+
+          messages.value[assistantIndex].cost = event.data.cost;
+          messages.value[assistantIndex].promptTokens = event.data.promptTokens;
+          messages.value[assistantIndex].completionTokens = event.data.completionTokens;
+          messages.value[assistantIndex].totalTokens = event.data.totalTokens;
+
+          console.log('finished');
+          console.log(JSON.stringify(event.data));
 
           // 通过API更新最终状态
           await api.updateMessage(messages.value[assistantIndex]);
           break;
-        case 'progress':
+        case 'chat':
           // 处理流式输出
           // 更新助手消息的状态和内容
           messages.value[assistantIndex].content = messages.value[assistantIndex].content + event.data.content;
           messages.value[assistantIndex].status = 'processing';
+          break;
+        case 'tool':
+          // 更新工具结果消息
+          if (!messages.value[assistantIndex].tools) {
+            messages.value[assistantIndex].tools = [];
+          }
+          messages.value[assistantIndex].tools.push(event.data);
+          console.log('tool', messages.value[assistantIndex].tools);
           break;
       }
 
@@ -348,6 +378,7 @@ async function retryMessage(index: number) {
   }
 
   messages.value[index].content = ''; // 清空当前消息内容
+  messages.value[index].tools = []; // 清空工具结果
   messages.value[index].status = 'sending'; // 设置状态为发送中
   messages.value[index].createdAt = Date.now(); // 更新创建时间
   await api.updateMessage(messages.value[index]);
@@ -356,22 +387,39 @@ async function retryMessage(index: number) {
   await sendApiMessage(agent.value.id as number, currentSessionId.value as number, currentMessage.id, index);
 }
 
-// 修复删除消息功能
+// 修改删除消息函数
 async function deleteMessage(index: number) {
   const currentMessage = messages.value[index];
   if (!currentMessage) return;
   
   try {
-    // 如果消息有ID，从数据库中删除
-    if (currentMessage.id) {
-      await api.deleteMessage(currentMessage.id);
-    }
-    
-    // 从界面中删除消息
-    messages.value.splice(index, 1);
-    
-    // 通知用户
-    message.success('消息已删除');
+    // 显示确认对话框
+    await dialog.warning({
+      title: '确认删除',
+      content: '会同时删除关联的消息,确认吗?,此操作不可恢复',
+      positiveText: '确认',
+      negativeText: '取消',
+      style: {
+        position: 'relative',
+        marginTop: '20vh'
+      },
+      onPositiveClick: async () => {
+        if (currentMessage.id) {
+          if (currentMessage.role === 'assistant') {
+            await api.deleteMessage(currentMessage.id);
+            messages.value.splice(index, 1);
+            await api.deleteMessage(currentMessage.id - 1);
+            messages.value.splice(index - 1, 1);
+          } else {
+            await api.deleteMessage(currentMessage.id);
+            messages.value.splice(index, 1);
+            await api.deleteMessage(currentMessage.id + 1);
+            messages.value.splice(index, 1);
+          }
+        }
+        message.success('消息已删除');
+      }
+    });
   } catch (error) {
     console.error('删除消息失败', error);
     message.error('删除消息失败');
@@ -382,11 +430,24 @@ async function deleteMessage(index: number) {
 async function clearSession() {
   if (currentSessionId.value) {
     try {
-      // 通过API删除会话的所有消息
-      await api.deleteMessagesBySession(currentSessionId.value);
-      
-      // 更新本地状态
-      messages.value = [];
+      // 显示确认对话框
+      await dialog.warning({
+        title: '确认清除',
+        content: '是否清除当前会话的所有消息？此操作不可恢复',
+        positiveText: '确认',
+        negativeText: '取消',
+        style: {
+          position: 'relative',
+          marginTop: '20vh'
+        },
+        onPositiveClick: async () => {
+          // 通过API删除会话的所有消息
+          await api.deleteMessagesBySession(currentSessionId.value as number);
+          // 更新本地状态
+          messages.value = [];
+          message.success('会话消息已清除');
+        }
+      });
     } catch (error) {
       console.error('清除会话消息失败:', error);
       message.error('清除会话消息失败');

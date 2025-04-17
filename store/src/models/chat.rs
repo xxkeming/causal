@@ -33,6 +33,19 @@ pub struct Attachment {
     pub data: String,
 }
 
+/// 工具结果
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ToolResult {
+    /// 工具ID
+    pub id: String,
+    /// 工具名称
+    pub name: String,
+    /// 工具参数
+    pub arguments: String,
+    /// 工具结果
+    pub result: String,
+}
+
 /// 聊天消息
 #[derive(Debug, Serialize, Deserialize, Collection, Clone)]
 #[collection(name = "chat_messages", primary_key = u64)]
@@ -47,12 +60,28 @@ pub struct ChatMessage {
     pub role: Role,
     /// 内容
     pub content: String,
+    /// 工具结果
+    pub tools: Option<Vec<ToolResult>>,
     /// 附件
     pub attachments: Option<Vec<Attachment>>,
     /// 状态
     pub status: MessageStatus,
+
     /// 耗时
     pub cost: Option<i64>,
+
+    /// prompt_tokens
+    #[serde(rename = "promptTokens")]
+    pub prompt_tokens: Option<u32>,
+
+    /// completion_tokens
+    #[serde(rename = "completionTokens")]
+    pub completion_tokens: Option<u32>,
+
+    /// 总tokens
+    #[serde(rename = "totalTokens")]
+    pub total_tokens: Option<u32>,
+
     /// 创建时间
     #[serde(rename = "createdAt")]
     pub created_at: i64,

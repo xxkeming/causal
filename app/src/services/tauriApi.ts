@@ -36,13 +36,28 @@ export type  MessageEvent =
     event: 'started';
   }
 | {
-    event: 'progress';
+    event: 'chat';
     data: {
       content: string;
     };
   }
 | {
+    event: 'tool';
+    data: {
+      id: string;
+      name: string;
+      arguments: string;
+      result: string;
+    };
+  }
+| {
     event: 'finished';
+    data: {
+      cost: number;
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
 };
     
 /**
@@ -71,6 +86,24 @@ export async function event_local(agentId: number, sessionId: number, messageId:
     return result.data === undefined ? true : result.data as Object;
   } catch (error) {
     console.error('Failed to call event_local function:', error);
+    throw error;
+  }
+}
+
+// 转换各种文档为md格式
+export async function convert(path: string) {
+  try {
+    console.log('convert:', path);
+
+    let result = await invoke('convert', { path }) as Response;
+    console.log('convert result:', result);
+
+    if (result.status === "error") {
+      throw 'error:' + result.error;
+    }
+    return result.data === undefined ? true : result.data as Object;
+  } catch (error) {
+    console.error('Failed to call convert function:', error);
     throw error;
   }
 }

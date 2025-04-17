@@ -42,36 +42,58 @@ pub struct Agent {
     /// 智能体ID
     #[natural_id]
     pub id: u64,
+
     /// 所属类别ID
     #[serde(rename = "categoryId")]
     pub category_id: u64,
+
     /// 图标ID
     #[serde(rename = "iconId")]
     pub icon_id: Option<u64>,
+
     /// 名称
     pub name: String,
+
     /// 描述
     pub description: Option<String>,
+
     /// 使用的模型
     pub model: Option<ProviderModel>,
+
     /// 提示词
     pub prompt: String,
+
     /// 生成文本的随机程度(0-2)
     pub temperature: f64,
+
     /// 词汇多样性(0-1)
     /// 最大消息长度，0表示不限制
     #[serde(rename = "maxTokens")]
     pub max_tokens: u32,
+
     /// 上下文保留消息数量
     #[serde(rename = "contextSize")]
     pub context_size: u32,
+
+    /// 上下文是否保留扩展数据
+    #[serde(default, rename = "contextExtend")]
+    pub context_extend: bool,
+
     /// 自定义参数
     pub params: Option<Vec<ModelParam>>,
+
     /// 工具集合
     pub tools: Option<Vec<u64>>,
+
+    /// 自定义问题
+    /// 例如: ["你是谁", "你能做什么"]
+    #[serde(rename = "customQuestions")]
+    pub custom_questions: Option<Vec<String>>,
+
     /// 创建时间, 单位秒
     #[serde(rename = "createdAt")]
     pub created_at: i64,
+
     /// 更新时间
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<i64>,

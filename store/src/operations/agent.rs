@@ -240,12 +240,14 @@ mod tests {
             temperature: 0.7,
             max_tokens: 2000,
             context_size: 10,
+            context_extend: false,
             params: Some(vec![ModelParam {
                 name: "test_param".to_string(),
                 param_type: "string".to_string(),
                 value: "test_value".to_string(),
             }]),
             tools: Some(vec![1, 2, 3]),
+            custom_questions: Some(vec!["你是谁?".to_string(), "你能做什么?".to_string()]),
             created_at: 0, // 将被覆盖
             updated_at: None,
         };
@@ -319,8 +321,10 @@ mod tests {
             temperature: 0.7,
             max_tokens: 2000,
             context_size: 10,
+            context_extend: false,
             params: None,
             tools: None,
+            custom_questions: None,
             created_at: 0,
             updated_at: None,
         };
@@ -336,8 +340,10 @@ mod tests {
             temperature: 0.7,
             max_tokens: 2000,
             context_size: 10,
+            context_extend: false,
             params: None,
             tools: None,
+            custom_questions: None,
             created_at: 0,
             updated_at: None,
         };
@@ -353,8 +359,10 @@ mod tests {
             temperature: 0.7,
             max_tokens: 2000,
             context_size: 10,
+            context_extend: false,
             params: None,
             tools: None,
+            custom_questions: None,
             created_at: 0,
             updated_at: None,
         };
@@ -408,8 +416,10 @@ mod tests {
             temperature: 0.7,
             max_tokens: 2000,
             context_size: 10,
+            context_extend: false,
             params: None,
             tools: None,
+            custom_questions: None,
             created_at: Utc::now().timestamp(),
             updated_at: None,
         };

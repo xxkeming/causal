@@ -76,11 +76,18 @@ export interface Agent {
   // 默认 5
   contextSize: number;
 
+  // 上下文是否保留扩展数据
+  contextExtend: boolean;
+
   // 自定义参数
   params?: ModelParam[];
 
   // 工具集合
   tools?: number[];
+
+  // 自定义问题
+  // 1. 自定义问题, 例如: 你是谁? 你能做什么?
+  customQuestions?: string[];
 
   createdAt: i64;
   updatedAt?: i64;
@@ -194,6 +201,18 @@ export interface Attachment {
   data: string;
 }
 
+// 工具执行结果
+export interface ToolResult {
+  // 工具id
+  id: string;
+  // 工具名称
+  name: string;
+  // json格式
+  arguments: string;
+  // json格式
+  result: string;
+}
+
 // 聊天信息
 export interface ChatMessage {
   // 消息ID
@@ -205,10 +224,22 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 
+  //工具消息结果
+  tools?: ToolResult[];
+  
   // 附件
   attachments?: Attachment[];
 
   status: string;
+
+  // 耗时
+  cost?: number;
+
+  // totalTokens > 0 时显示
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  
   createdAt: number;
   updatedAt?: number;
 }

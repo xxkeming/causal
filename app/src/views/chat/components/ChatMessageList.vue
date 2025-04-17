@@ -63,6 +63,25 @@
           </div>
           <div class="message-content">
             <div class="message-text" v-if="message.status !== 'error'">
+              <!-- 添加工具执行结果显示 -->
+              <div v-if="message.tools && message.tools.length > 0" class="tools-results">
+                <details v-for="tool in message.tools" :key="tool.id" class="tool-details">
+                  <summary class="tool-summary">
+                    <n-icon><TerminalOutline /></n-icon>
+                    <span class="tool-name">{{ tool.name }}</span>
+                  </summary>
+                  <div class="tool-content">
+                    <div class="tool-section">
+                      <div class="tool-label">参数：</div>
+                      <pre class="tool-data">{{ formatJson(tool.arguments) }}</pre>
+                    </div>
+                    <div class="tool-section">
+                      <div class="tool-label">结果：</div>
+                      <pre class="tool-data">{{ formatJson(tool.result) }}</pre>
+                    </div>
+                  </div>
+                </details>
+              </div>
               <!-- 显示动图效果 -->
               <div v-if="message.role === 'assistant' && message.status === 'sending'" class="loading-animation">
                 <span class="dot"></span>
@@ -75,7 +94,15 @@
                 :content="message.content" 
                 :key="`md-${index}-${message.updatedAt || message.createdAt}`"
               />
-              <n-text v-else>{{ message.content }}</n-text>
+              <div v-else class="user-message-content">{{ message.content }}</div>
+              
+              <!-- 添加统计信息显示 -->
+              <div v-if="message.role === 'assistant' && message.status === 'success'" class="message-stats">
+                <span v-if="message.totalTokens !== undefined && message.totalTokens > 0">
+                  Tokens total: {{ message.totalTokens }} prompt: {{ message.promptTokens }}
+                </span>
+                <span v-if="message.cost">耗时: {{ formatCost(message.cost) }}</span>
+              </div>
             </div>
             <div class="message-error" v-else>
               <div class="custom-error-alert">
@@ -129,11 +156,11 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { 
-  NAvatar, NIcon, NButton, NText 
+  NAvatar, NIcon, NButton 
 } from 'naive-ui';
 import { 
   ServerOutline, PersonOutline, AlertCircleOutline,
-  RefreshOutline, TrashOutline, CopyOutline  // 添加复制图标
+  RefreshOutline, TrashOutline, CopyOutline, TerminalOutline,
 } from '@vicons/ionicons5';
 import MarkdownRenderer from '../../../components/MarkdownRenderer.vue';
 import { ChatMessage } from '../../../services/typings';
@@ -211,6 +238,29 @@ function formatErrorMessage(content: string): string {
   }
 }
 
+// 添加格式化JSON的方法
+function formatJson(jsonString: string): string {
+  try {
+    const parsed = JSON.parse(jsonString);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return jsonString;
+  }
+}
+
+// 在 setup 中添加格式化耗时的函数
+function formatCost(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  } else if (ms < 60000) {
+    return `${(ms / 1000).toFixed(1)}秒`;
+  } else {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = ((ms % 60000) / 1000).toFixed(1);
+    return `${minutes}分${seconds}秒`;
+  }
+}
+
 // 添加新的响应式变量用于跟踪滚动状态
 const isAtBottom = ref(true);
 const scrollThreshold = 100; // 距离底部多少像素内认为在底部
@@ -257,7 +307,7 @@ watch(() => props.messages, (newMessages, oldMessages) => {
       scrollToBottom();
     });
   }
-}, { deep: true });
+}, { immediate: true, deep: true });
 
 // 监听agentIcon变化，强制重新渲染
 watch(() => props.agentIcon, () => {
@@ -634,5 +684,93 @@ function copyMessage(message: ChatMessage) {
   padding: 0;
   background: none;
   border: none;
+}
+
+/* 工具执行结果样式 */
+.tools-results {
+  margin: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool-details {
+  border-radius: 2px;
+  border-left: 1px solid #6b7280;
+  background-color: #f9fafb;
+  overflow: hidden;
+}
+
+.tool-summary {
+  padding: 3px 5px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  gap: 6px;
+}
+
+.tool-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-content {
+  padding: 4px 5px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.95em;
+  color: #4b5563;
+}
+
+.tool-section {
+  margin-bottom: 8px;
+}
+
+.tool-section:last-child {
+  margin-bottom: 0;
+}
+
+.tool-label {
+  font-size: 13px;
+  color: var(--text-color-secondary, #666);
+  margin-bottom: 4px;
+}
+
+.tool-data {
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  background-color: var(--hover-color, #f5f5f5);
+  padding: 8px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 添加统计信息样式 */
+.message-stats {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  font-size: 11px;
+  color: #888;
+}
+
+.message-stats span {
+  white-space: nowrap;
+}
+
+/* 添加用户消息内容样式 */
+.user-message-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #24292e;
+  padding: 2px 0;
 }
 </style>

@@ -35,6 +35,7 @@ pub async fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![fetch, event])
         .manage(store)
+        // .manage(causal_dir)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

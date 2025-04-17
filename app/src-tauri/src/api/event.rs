@@ -7,8 +7,9 @@ use async_openai::{
         ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
         ChatCompletionRequestToolMessageArgs, ChatCompletionRequestUserMessageArgs,
-        ChatCompletionToolArgs, ChatCompletionToolType, CreateChatCompletionRequest,
-        CreateChatCompletionRequestArgs, FinishReason, FunctionCall, FunctionObjectArgs,
+        ChatCompletionToolArgs, ChatCompletionToolType, CompletionUsage,
+        CreateChatCompletionRequest, CreateChatCompletionRequestArgs, FinishReason, FunctionCall,
+        FunctionObjectArgs,
     },
     Client,
 };
@@ -17,12 +18,28 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::{sync::Mutex, task::JoinSet};
 
-#[derive(Clone, Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 pub enum MessageEvent {
     Started,
-    Progress { content: String },
-    Finished,
+    Chat {
+        content: String,
+    },
+    Tool {
+        id: String,
+        name: String,
+        arguments: String,
+        result: String,
+    },
+    Finished {
+        cost: i64,
+        #[serde(rename = "promptTokens")]
+        prompt_tokens: u32,
+        #[serde(rename = "completionTokens")]
+        completion_tokens: u32,
+        #[serde(rename = "totalTokens")]
+        total_tokens: u32,
+    },
 }
 
 async fn call_fn(name: &str, args: &str) -> Result<Value, Box<dyn std::error::Error>> {
@@ -46,10 +63,10 @@ async fn call_fn(name: &str, args: &str) -> Result<Value, Box<dyn std::error::Er
 async fn event_chat_stream(
     client: &Client<OpenAIConfig>, request: CreateChatCompletionRequest,
     messages: &mut Vec<ChatCompletionRequestMessage>, on_event: &tauri::ipc::Channel<MessageEvent>,
-) -> Result<bool, error::Error> {
+) -> Result<(bool, Option<CompletionUsage>), error::Error> {
     // let prompt = messages.pop().unwrap();
 
-    println!("messages: {:?}", messages);
+    // println!("messages: {:?}", messages);
 
     let mut stream = client.chat().create_stream(request).await?;
 
@@ -60,6 +77,8 @@ async fn event_chat_stream(
 
     while let Some(result) = stream.next().await {
         let response = result?;
+        // println!("response: {:?}", response.usage);
+
         for chat_choice in response.choices {
             if let Some(tool_calls) = chat_choice.delta.tool_calls {
                 for tool_call_chunk in tool_calls.into_iter() {
@@ -89,7 +108,12 @@ async fn event_chat_stream(
             }
 
             if let Some(finish_reason) = &chat_choice.finish_reason {
-                println!("finish_reason: {:?} {:?}", finish_reason, tool_call_states);
+                // println!("finish_reason: {:?} {:?}", finish_reason, tool_call_states);
+
+                if matches!(finish_reason, FinishReason::Stop) {
+                    return Ok((false, response.usage));
+                }
+
                 // on_event.send(MessageEvent::Finished).map_err(|_| error::Error::Unknown)?;
                 if matches!(finish_reason, FinishReason::ToolCalls) {
                     let mut sets = JoinSet::new();
@@ -111,6 +135,17 @@ async fn event_chat_stream(
                     let tool_calls: Vec<ChatCompletionMessageToolCall> =
                         tool_call_responses.iter().map(|tc| tc.0.clone()).collect();
 
+                    for tc in tool_call_responses.iter() {
+                        on_event
+                            .send(MessageEvent::Tool {
+                                id: tc.0.id.clone(),
+                                name: tc.0.function.name.clone(),
+                                arguments: tc.0.function.arguments.clone(),
+                                result: tc.1.to_string(),
+                            })
+                            .map_err(|_| error::Error::Unknown)?;
+                    }
+
                     let assistant_messages: ChatCompletionRequestMessage =
                         ChatCompletionRequestAssistantMessageArgs::default()
                             .tool_calls(tool_calls)
@@ -126,30 +161,30 @@ async fn event_chat_stream(
                             .into();
                         messages.push(tool_message);
                     }
-                    return Ok(true);
+                    return Ok((true, response.usage));
                 }
             }
 
             // println!("index: {:?}", chat_choice.index);
 
             if let Some(content) = chat_choice.delta.content {
-                on_event
-                    .send(MessageEvent::Progress { content })
-                    .map_err(|_| error::Error::Unknown)?;
+                on_event.send(MessageEvent::Chat { content }).map_err(|_| error::Error::Unknown)?;
             }
         }
     }
 
-    Ok(false)
+    Ok((false, None))
 }
 
 async fn event_chat(
     client: &Client<OpenAIConfig>, request: CreateChatCompletionRequest,
     messages: &mut Vec<ChatCompletionRequestMessage>, on_event: &tauri::ipc::Channel<MessageEvent>,
-) -> Result<bool, error::Error> {
-    println!("messages: {:?}", messages);
+) -> Result<(bool, Option<CompletionUsage>), error::Error> {
+    // println!("messages: {:?}", messages);
 
     let response = client.chat().create(request).await?;
+
+    // println!("response: {:?}", response.usage);
 
     for choice in response.choices {
         if let Some(tool_calls) = choice.message.tool_calls {
@@ -187,19 +222,19 @@ async fn event_chat(
                     .into();
                 messages.push(tool_message);
             }
-            return Ok(true);
+            return Ok((true, response.usage));
         }
 
         if let Some(content) = choice.message.content {
-            on_event.send(MessageEvent::Progress { content }).map_err(|_| error::Error::Unknown)?;
+            on_event.send(MessageEvent::Chat { content }).map_err(|_| error::Error::Unknown)?;
         }
     }
 
-    Ok(false)
+    Ok((false, response.usage))
 }
 
 pub async fn event(
-    store: tauri::State<'_, store::Store>, agent_id: u64, _session_id: u64, message_id: u64,
+    store: tauri::State<'_, store::Store>, agent_id: u64, session_id: u64, message_id: u64,
     search: bool, stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
     let Some(agent) = store.get_agent(agent_id)? else {
@@ -215,10 +250,18 @@ pub async fn event(
         return Err(error::Error::InvalidData(format!("Provider with {:?} not found", model)));
     };
 
-    println!("Provider: {:?}", provider);
+    // println!("Provider: {:?}", provider);
 
-    let message = store.get_chat_message(message_id - 1)?;
-    let Some(message) = message else {
+    let mut contexts = store.get_messages_by_session_and_message(
+        session_id,
+        message_id - 1,
+        agent.context_size as usize * 2 + 1,
+    )?;
+    for message in contexts.iter() {
+        println!("Message: {:?}", message.role);
+    }
+
+    let Some(message) = contexts.pop() else {
         return Err(error::Error::InvalidData(format!(
             "Message with id {} not found",
             message_id - 1
@@ -304,16 +347,31 @@ pub async fn event(
         )
         .build()?];
 
-    let mut messages = vec![
-        ChatCompletionRequestSystemMessageArgs::default()
-            .content(agent.prompt.clone())
-            .build()?
-            .into(),
-        ChatCompletionRequestUserMessageArgs::default().content(content).build()?.into(),
-    ];
+    let mut messages = vec![ChatCompletionRequestSystemMessageArgs::default()
+        .content(agent.prompt.clone())
+        .build()?
+        .into()];
+
+    for context in contexts.iter() {
+        let message = if context.role == store::Role::User {
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(context.content.clone())
+                .build()?
+                .into()
+        } else {
+            ChatCompletionRequestAssistantMessageArgs::default()
+                .content(context.content.clone())
+                .build()?
+                .into()
+        };
+        messages.push(message);
+    }
+    messages.push(ChatCompletionRequestUserMessageArgs::default().content(content).build()?.into());
 
     on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
 
+    let mut usages = Vec::new();
+    let cost = std::time::Instant::now();
     loop {
         let mut request = CreateChatCompletionRequestArgs::default()
             .model(model.name.clone())
@@ -328,18 +386,38 @@ pub async fn event(
 
         // .top_p(agent.top_p as f32);
 
-        if stream {
-            if !event_chat_stream(&client, request, &mut messages, &on_event).await? {
-                break;
-            }
+        let (is_continue, usage) = if stream {
+            event_chat_stream(&client, request, &mut messages, &on_event).await?
         } else {
-            if !event_chat(&client, request, &mut messages, &on_event).await? {
-                break;
-            }
+            event_chat(&client, request, &mut messages, &on_event).await?
         };
+
+        usages.push(usage);
+        if !is_continue {
+            break;
+        }
     }
 
-    on_event.send(MessageEvent::Finished).map_err(|_| error::Error::Unknown)?;
+    let (prompt_tokens, completion_tokens, total_tokens) = usages
+        .into_iter()
+        .filter_map(|usage| usage)
+        .fold((0, 0, 0), |(prompt, completion, total), usage| {
+            (
+                prompt + usage.prompt_tokens,
+                completion + usage.completion_tokens,
+                total + usage.total_tokens,
+            )
+        });
+
+    let finised = MessageEvent::Finished {
+        cost: cost.elapsed().as_millis() as i64,
+        prompt_tokens: prompt_tokens,
+        completion_tokens: completion_tokens,
+        total_tokens: total_tokens,
+    };
+    println!("Finished: {:?}", finised);
+
+    on_event.send(finised).map_err(|_| error::Error::Unknown)?;
 
     Ok(serde_json::json!({
         "status": "success"

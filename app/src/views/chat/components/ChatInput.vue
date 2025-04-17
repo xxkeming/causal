@@ -125,6 +125,7 @@ import {
   GlobeOutline // 修改为正确的离线模式图标
 } from '@vicons/ionicons5';
 import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
+import { open } from "@tauri-apps/plugin-dialog";
 
 const props = defineProps<{
   loading: boolean;

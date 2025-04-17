@@ -1,6 +1,6 @@
-use crate::Store;
 use crate::error::StoreError;
 use crate::models::{ChatMessage, ChatSession};
+use crate::{MessageStatus, Store};
 use bonsaidb::core::schema::SerializedCollection;
 use chrono::Utc;
 
@@ -231,6 +231,36 @@ impl Store {
 
         Ok(messages)
     }
+
+    /// 根据会话里面的一条消息,查找指定条数的消息
+    pub fn get_messages_by_session_and_message(
+        &self, session_id: u64, message_id: u64, limit: usize,
+    ) -> Result<Vec<ChatMessage>, StoreError> {
+        let messages = self.get_messages_by_session(session_id)?;
+
+        let error_messages = messages
+            .iter()
+            .filter_map(|m| (m.status != MessageStatus::Success).then_some(m.id))
+            .collect::<Vec<_>>();
+
+        // 按时间戳排序（降序）
+        let mut sorted_messages: Vec<ChatMessage> = messages
+            .into_iter()
+            .filter(|m| {
+                m.id <= message_id
+                    && (!error_messages.contains(&m.id) || !error_messages.contains(&(m.id - 1)))
+            })
+            .collect();
+
+        sorted_messages.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+        // 限制返回数量
+        if sorted_messages.len() > limit {
+            sorted_messages.truncate(limit);
+        }
+
+        Ok(sorted_messages)
+    }
 }
 
 #[cfg(test)]
@@ -311,8 +341,12 @@ mod tests {
             role: Role::User,
             content: "你好，这是一条测试消息".to_string(),
             status: MessageStatus::Sending,
-            cost: Some(0),
+            cost: None,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
             created_at: 0, // 将被自动设置
+            tools: None,
             attachments: None,
         };
 
@@ -350,7 +384,11 @@ mod tests {
                 content: format!("测试消息 {}", i),
                 status: MessageStatus::Success,
                 cost: Some(i as i64),
+                prompt_tokens: Some(i as u32),
+                completion_tokens: Some(i as u32),
+                total_tokens: Some(i as u32),
                 created_at: Utc::now().timestamp() + i as i64, // 递增的时间戳
+                tools: None,
                 attachments: None,
             };
             store.add_chat_message(msg).unwrap();
@@ -383,8 +421,12 @@ mod tests {
             role: Role::User,
             content: "新的测试消息".to_string(),
             status: MessageStatus::Sending,
-            cost: Some(0),
+            cost: None,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
             created_at: Utc::now().timestamp(),
+            tools: None,
             attachments: None,
         };
         store.add_chat_message(msg).unwrap();
@@ -413,8 +455,12 @@ mod tests {
             role: Role::User,
             content: "测试消息".to_string(),
             status: MessageStatus::Success,
-            cost: Some(0),
+            cost: None,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
             created_at: 0,
+            tools: None,
             attachments: None,
         };
 
