@@ -14,7 +14,8 @@
       {
         "title": "Causal Studio",
         "width": 1152,
-        "height": 864
+        "height": 864,
+        "dragDropEnabled": false
       }
     ],
     "security": {

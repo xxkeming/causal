@@ -284,14 +284,14 @@ async function updateSessionName() {
 // 添加右键菜单配置
 const menuOptions = [
   {
-    label: '新对话',
-    key: 'copy',
-    icon: () => h(NIcon, null, { default: () => h(CopyOutline) })
-  },
-  {
     label: '编辑',
     key: 'edit',
     icon: () => h(NIcon, null, { default: () => h(CreateOutline) })
+  },
+  {
+    label: '新对话',
+    key: 'copy',
+    icon: () => h(NIcon, null, { default: () => h(CopyOutline) })
   },
   {
     label: '删除',

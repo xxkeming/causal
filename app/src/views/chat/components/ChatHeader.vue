@@ -42,15 +42,15 @@
         />
       </div>
       
-      <!-- 配置按钮 - 修复图标 -->
-      <!-- <n-tooltip trigger="hover">
+      <!-- 配置按钮 -->
+      <n-tooltip trigger="hover">
         <template #trigger>
-          <n-button class="action-button" circle tertiary size="small" @click="onShowConfig">
+          <n-button class="action-button" circle tertiary size="small" @click="onModelConfig">
             <n-icon><SettingsOutline /></n-icon>
           </n-button>
         </template>
-        编辑智能体配置
-      </n-tooltip> -->
+        模型配置
+      </n-tooltip>
     </n-space>
     
     <!-- 右侧按钮组 - 修复图标 -->
@@ -77,12 +77,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { 
   NIcon, NButton, NTooltip, NSpace
 } from 'naive-ui';
 import { 
   ServerOutline, TrashBinOutline, CloseOutline,
-  MenuOutline
+  MenuOutline, SettingsOutline
 } from '@vicons/ionicons5';
 import { Agent } from '../../../services/typings';
 import ModelSelector from '../../../components/ModelSelector.vue';
@@ -110,9 +111,16 @@ const modelValue = computed({
   set: (value) => emit('update:selectedModelValue', value)
 });
 
+const router = useRouter();
+
 // 事件处理函数 (移除 onSwitchAgent 函数)
 const toggleSidebar = () => emit('toggle-sidebar');
 const onShowConfig = () => emit('show-config');
+const onModelConfig = () => {
+  if (props.agent?.model?.id) {
+    router.push(`settings/model?providerId=${props.agent.model.id}`);
+  }
+};
 const onClearSession = () => emit('clear-session');
 const onCloseSession = () => emit('close-session');
 const onModelChange = (model: any) => emit('model-change', model);

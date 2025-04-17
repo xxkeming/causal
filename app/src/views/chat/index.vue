@@ -45,6 +45,7 @@
           <chat-input 
             :loading="loading"
             v-model:stream="stream"
+            v-model:search="search"
             @send="sendMessage"
           />
         </template>
@@ -126,6 +127,7 @@ const agent = ref<Agent | null>(null);
 const loading = ref(false);
 const siderCollapsed = ref(false);
 const stream = ref(true); // 添加stream状态
+const search = ref(false); // 添加联网搜索状态
 
 // 计算属性
 const hasActiveSession = computed(() => 
@@ -286,7 +288,7 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
     loading.value = true;
 
     // 模拟流式输出，将文件信息传递给API
-    await chatEvent(agentId, sessionId, messageId, stream.value, async (event: MessageEvent) => {
+    await chatEvent(agentId, sessionId, messageId, search.value, stream.value, async (event: MessageEvent) => {
       switch (event.event) {
         case 'started':
           console.log('started');

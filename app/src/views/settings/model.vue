@@ -227,6 +227,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   NLayout,
   NLayoutSider,
@@ -257,6 +258,8 @@ import {
 } from '@vicons/ionicons5';
 import { useProviderStore, ProviderApiCategory } from '../../stores/providerStore';
 import { Model } from '../../services/typings';
+
+const route = useRoute();
 
 // 组件状态
 const currentProviderId = ref<number | null>(null);
@@ -551,7 +554,15 @@ onMounted(async () => {
   loadingDetails.value = true;
   try {
     await providerStore.fetchAllProviders();
-    if (providerStore.providers.length > 0) {
+    
+    // 获取 URL 参数中的 providerId
+    const providerId = route.query.providerId ? Number(route.query.providerId) : null;
+    
+    if (providerId && providerStore.providers.find(p => p.id === providerId)) {
+      // 如果 URL 中有 providerId 且存在该提供商，则选择它
+      selectProvider(providerId);
+    } else if (providerStore.providers.length > 0) {
+      // 否则选择第一个提供商
       selectProvider(providerStore.providers[0].id);
     }
   } catch (error) {

@@ -2,8 +2,10 @@ use crate::error;
 
 use futures::StreamExt;
 use rig::{
-    completion::Prompt,
-    streaming::{StreamingChoice, StreamingPrompt},
+    completion::Completion,
+    message::{AssistantContent, Message, ToolCall, ToolResult, ToolResultContent, UserContent},
+    streaming::{StreamingChoice, StreamingCompletion, StreamingCompletionModel},
+    OneOrMany,
 };
 use serde::Serialize;
 
@@ -16,63 +18,117 @@ pub enum MessageEvent {
 }
 
 async fn event_chat_stream(
-    agent: rig::agent::Agent<rig::providers::openai::CompletionModel>, prompt: String,
-    on_event: tauri::ipc::Channel<MessageEvent>,
-) -> Result<serde_json::Value, error::Error> {
-    let mut stream = agent.stream_prompt(&prompt).await?;
+    agent: &rig::agent::Agent<rig::providers::openai::CompletionModel>, prompt: &str,
+    messages: &mut Vec<Message>, on_event: &tauri::ipc::Channel<MessageEvent>,
+) -> Result<bool, error::Error> {
+    // let prompt = messages.pop().unwrap();
 
-    on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
+    println!("messages: {:?}", messages);
 
+    let mut stream = agent.stream_completion(prompt, messages.clone()).await?.stream().await?;
+
+    let mut tool_messages = vec![];
     while let Some(chunk) = stream.next().await {
         match chunk {
             Ok(StreamingChoice::Message(content)) => {
-                print!("{}", content);
+                print!("content: {}", content);
                 on_event
                     .send(MessageEvent::Progress { content })
                     .map_err(|_| error::Error::Unknown)?;
             }
-            Ok(StreamingChoice::ToolCall(name, _, params)) => {
+            Ok(StreamingChoice::ToolCall(name, id, params)) => {
                 let res = agent
                     .tools
                     .call(&name, params.to_string())
                     .await
                     .map_err(|e| std::io::Error::other(e.to_string()))?;
-                println!("\nResult: {}", res);
+
+                println!("tools call: {} {} {}", name, id, params.to_string());
+
+                let result =
+                    ToolResult { id, content: OneOrMany::one(ToolResultContent::text(res)) };
+                tool_messages.push(Message::User {
+                    content: OneOrMany::one(UserContent::ToolResult(result)),
+                });
+
+                // println!("tools: \nResult: {}", res);
             }
             Err(e) => {
-                eprintln!("Error: {}", e);
+                println!("Error: {}", e);
                 break;
             }
         }
     }
 
-    on_event.send(MessageEvent::Finished).map_err(|_| error::Error::Unknown)?;
-
-    Ok(serde_json::json!({
-        "status": "success"
-    }))
+    if tool_messages.len() > 0 {
+        messages.extend(tool_messages);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 async fn event_chat(
-    agent: rig::agent::Agent<rig::providers::openai::CompletionModel>, prompt: String,
-    on_event: tauri::ipc::Channel<MessageEvent>,
-) -> Result<serde_json::Value, error::Error> {
-    on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
+    agent: &rig::agent::Agent<rig::providers::openai::CompletionModel>, prompt: &str,
+    messages: &mut Vec<Message>, on_event: &tauri::ipc::Channel<MessageEvent>,
+) -> Result<bool, error::Error> {
+    println!("messages: {:?}", messages);
 
-    let content = agent.prompt(prompt).await?;
+    let prompt = messages.pop().unwrap();
+    let resp = agent.completion(prompt.clone(), messages.clone()).await?.send().await?;
+    messages.push(prompt);
 
-    on_event.send(MessageEvent::Progress { content }).map_err(|_| error::Error::Unknown)?;
+    let mut tool_messages = vec![];
+    for content in resp.choice.into_iter() {
+        match content {
+            AssistantContent::Text(content) => {
+                print!("{}", content.text);
+                on_event
+                    .send(MessageEvent::Progress { content: content.text })
+                    .map_err(|_| error::Error::Unknown)?;
+            }
+            AssistantContent::ToolCall(tool) => {
+                let res = agent
+                    .tools
+                    .call(&tool.function.name, tool.function.arguments.to_string())
+                    .await
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-    on_event.send(MessageEvent::Finished).map_err(|_| error::Error::Unknown)?;
+                println!(
+                    "tools call: {} {} {}",
+                    tool.function.name,
+                    tool.id,
+                    tool.function.arguments.to_string()
+                );
 
-    Ok(serde_json::json!({
-        "status": "success"
-    }))
+                let call = ToolCall { id: tool.id.clone(), function: tool.function };
+                tool_messages.push(Message::Assistant {
+                    content: OneOrMany::one(AssistantContent::ToolCall(call)),
+                });
+
+                let result = ToolResult {
+                    id: tool.id,
+                    content: OneOrMany::one(ToolResultContent::text(format!("Result: {}", res))),
+                };
+                tool_messages.push(Message::User {
+                    content: OneOrMany::one(UserContent::ToolResult(result)),
+                });
+            }
+        }
+    }
+
+    // on_event.send(MessageEvent::Progress { content }).map_err(|_| error::Error::Unknown)?;
+    if tool_messages.len() > 0 {
+        messages.extend(tool_messages);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 pub async fn event(
     store: tauri::State<'_, store::Store>, agent_id: u64, _session_id: u64, message_id: u64,
-    stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
+    search: bool, stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
     let Some(agent) = store.get_agent(agent_id)? else {
         return Err(error::Error::InvalidData(format!("Agent with id {agent_id} not found")));
@@ -111,21 +167,63 @@ pub async fn event(
 
     // 添加附件 client.context(doc)
     let client = if let Some(attachments) = message.attachments {
-        let mut contexts = String::new();
-        for attachment in attachments {
-            contexts.push_str(&format!(
-                "\n\n<attachment><name>{}</name><data>{}</data></attachment>",
-                attachment.name, attachment.data
-            ));
-        }
-        client.context(&contexts)
+        let attachments = attachments
+            .into_iter()
+            .map(|attachment| {
+                format!(
+                    "<attachment><name>{}</name><data>{}</data></attachment>",
+                    attachment.name, attachment.data
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        client.context(&attachments)
     } else {
         client
     };
 
-    if stream {
-        event_chat_stream(client.build(), message.content, on_event).await
+    // 联网搜索结果
+    let client = if search {
+        let search = tools::tavily_search(message.content.as_ref()).await.unwrap();
+        let search = search
+            .into_iter()
+            .map(|item| {
+                format!("<search><name>{}</name><data>{}</data></search>", item.title, item.content)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        println!("Search: {:?}", search);
+        client.context(&search)
     } else {
-        event_chat(client.build(), message.content, on_event).await
-    }
+        client
+    };
+
+    let client = client.tool(tools::Adder);
+    let client = client.build();
+
+    // 添加工具
+    // client.tools.add_tool(tools::Adder);
+
+    on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
+
+    let mut messages: Vec<Message> = Vec::new();
+    messages.push(Message::User {
+        content: OneOrMany::one(UserContent::text(message.content.clone())),
+    });
+
+    if stream {
+        while event_chat_stream(&client, &message.content, &mut messages, &on_event).await? {
+            continue;
+        }
+    } else {
+        while event_chat(&client, &message.content, &mut messages, &on_event).await? {
+            continue;
+        }
+    };
+
+    on_event.send(MessageEvent::Finished).map_err(|_| error::Error::Unknown)?;
+
+    Ok(serde_json::json!({
+        "status": "success"
+    }))
 }

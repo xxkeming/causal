@@ -1,7 +1,10 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use deno_core::*;
+use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
+
+use serde_json::json;
 
 // 请求配置
 #[derive(Debug, Deserialize)]
@@ -285,6 +288,86 @@ pub async fn js_run() -> Result<String, deno_error::JsErrorBox> {
     }
 }
 
+#[derive(Deserialize)]
+pub struct OperationArgs {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Math error")]
+pub struct MathError;
+
+#[derive(Deserialize, Serialize)]
+pub struct Adder;
+impl Tool for Adder {
+    const NAME: &'static str = "add";
+
+    type Error = MathError;
+    type Args = OperationArgs;
+    type Output = i32;
+
+    async fn definition(&self, _prompt: String) -> ToolDefinition {
+        ToolDefinition {
+            name: "add".to_string(),
+            description: "Add x and y together".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "x": {
+                        "type": "number",
+                        "description": "The first number to add"
+                    },
+                    "y": {
+                        "type": "number",
+                        "description": "The second number to add"
+                    }
+                }
+            }),
+        }
+    }
+
+    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        println!("[tool-call] Adding {} and {}", args.x, args.y);
+        let result = args.x + args.y;
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchResult {
+    pub title: String,
+    pub url: String,
+    pub content: String,
+    pub raw_content: Option<String>,
+    pub score: f32,
+}
+
+pub async fn tavily_search(query: &str) -> Result<Vec<SearchResult>, anyhow::Error> {
+    let tavily = tavily::Tavily::builder("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")
+        .timeout(std::time::Duration::from_secs(60))
+        .max_retries(5)
+        .build()?;
+
+    // let query = SearchRequest::new("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", query)
+    //     .include_raw_content(true);
+
+    let results = tavily.search(query).await?;
+
+    let results = results
+        .results
+        .into_iter()
+        .map(|result| SearchResult {
+            title: result.title,
+            url: result.url,
+            content: result.content,
+            raw_content: result.raw_content,
+            score: result.score,
+        })
+        .collect::<Vec<_>>();
+    Ok(results)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -292,5 +375,11 @@ mod test {
     #[tokio::test]
     async fn test() {
         js_run().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_tavily() {
+        let results = tavily_search("rust是什么").await.unwrap();
+        println!("result: {:?}", results);
     }
 }

@@ -1,5 +1,10 @@
 <template>
-  <div class="chat-input-floating-container">
+  <div class="chat-input-floating-container drop-zone"
+    @dragover.prevent.stop="handleDragOver"
+    @dragleave.prevent.stop="handleDragLeave"
+    @drop.prevent.stop="handleDrop"
+    :class="{ 'dragging': isDragging }">
+    
     <div class="chat-input-wrapper">
       <n-input
         v-model:value="inputMessage"
@@ -47,11 +52,29 @@
               </div>
             </div>
           </template>
-          上下文附件
+          上下文附件 (可拖拽文件到此处)
         </n-tooltip>
 
         <!-- 右侧发送按钮 -->
         <div class="toolbar-right">
+          <!-- 联网搜索按钮 -->
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                text
+                :class="searchButtonClass"
+                @click="$emit('update:search', !props.search)"
+              >
+                <template #icon>
+                  <n-icon>
+                    <component :is="props.search ? Globe : GlobeOutline" />
+                  </n-icon>
+                </template>
+              </n-button>
+            </template>
+            {{ props.search ? '联网模式' : '离线模式' }}
+          </n-tooltip>
+
           <!-- 替换开关为图标按钮 -->
           <n-tooltip trigger="hover" placement="top">
             <template #trigger>
@@ -89,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { NInput, NButton, NIcon, NTooltip, useMessage } from 'naive-ui';
 import { 
   SendOutline, 
@@ -97,24 +120,29 @@ import {
   CloseCircleOutline, 
   PauseCircleOutline,
   FlashOutline, // 添加流式输出图标
-  FlashOffOutline // 添加非流式输出图标
+  FlashOffOutline, // 添加非流式输出图标
+  Globe,    // 修改为正确的图标名称
+  GlobeOutline // 修改为正确的离线模式图标
 } from '@vicons/ionicons5';
 import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
 
 const props = defineProps<{
   loading: boolean;
   stream?: boolean; // 添加stream属性
+  search?: boolean; // 添加联网搜索属性
 }>();
 
 const emit = defineEmits<{
   (e: 'send', text: string, files?: File[]): void;
   (e: 'update:stream', value: boolean): void;
+  (e: 'update:search', value: boolean): void; // 添加事件
 }>();
 
 const inputMessage = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedFiles = ref<File[]>([]);
 const message = useMessage();
+const isDragging = ref(false);
 
 // 获取文件图标存储
 const fileIconStore = useFileIconStore();
@@ -131,6 +159,13 @@ const streamButtonClass = computed(() => ({
   'stream-inactive': !props.stream
 }));
 
+// 联网搜索按钮样式计算
+const searchButtonClass = computed(() => ({
+  'tool-button': true,
+  'search-active': props.search,
+  'search-inactive': !props.search
+}));
+
 // 触发文件选择对话框
 function triggerFileInput() {
   if (fileInputRef.value) {
@@ -138,31 +173,39 @@ function triggerFileInput() {
   }
 }
 
+// 添加文件处理公共函数
+function handleFiles(files: File[]) {
+  if (files.length === 0) return;
+  
+  const maxSize = 10 * 1024 * 1024;
+  // 先过滤重复文件
+  const uniqueFiles = files.filter(file => 
+    !selectedFiles.value.some(existingFile => 
+      existingFile.name === file.name && 
+      existingFile.size === file.size
+    )
+  );
+  
+  if (uniqueFiles.length < files.length) {
+    message.warning(`已过滤${files.length - uniqueFiles.length}个重复文件`);
+  }
+  
+  const oversizedFiles = uniqueFiles.filter(file => file.size > maxSize);
+  if (oversizedFiles.length > 0) {
+    message.warning(`有${oversizedFiles.length}个文件超过10MB大小限制，已被过滤`);
+    const validFiles = uniqueFiles.filter(file => file.size <= maxSize);
+    selectedFiles.value.push(...validFiles);
+  } else {
+    selectedFiles.value.push(...uniqueFiles);
+  }
+}
+
 // 处理选择的文件
 function handleFilesSelected(event: Event) {
   const target = event.target as HTMLInputElement;
-  if (target.files && target.files.length > 0) {
-    // 复制FileList为数组
-    const newFiles = Array.from(target.files);
-    
-    // 文件大小限制检查 (每个文件10MB)
-    const maxSize = 10 * 1024 * 1024;
-    const oversizedFiles = newFiles.filter(file => file.size > maxSize);
-    
-    if (oversizedFiles.length > 0) {
-      message.warning(`有${oversizedFiles.length}个文件超过10MB大小限制，已被过滤`);
-      // 过滤掉超大文件
-      const validFiles = newFiles.filter(file => file.size <= maxSize);
-      selectedFiles.value.push(...validFiles);
-    } else {
-      // 所有文件都符合大小要求
-      selectedFiles.value.push(...newFiles);
-    }
-    
-    // 重置文件输入框，这样可以再次选择同一文件
-    if (fileInputRef.value) {
-      fileInputRef.value.value = '';
-    }
+  if (target.files) {
+    handleFiles(Array.from(target.files));
+    target.value = ''; // 重置输入框
   }
 }
 
@@ -209,6 +252,45 @@ function handleSendOrStop() {
     sendMessage();
   }
 }
+
+// 处理拖拽相关事件
+function handleDragOver(e: DragEvent) {
+  isDragging.value = true;
+  e.dataTransfer!.dropEffect = 'copy';
+}
+
+function handleDragLeave() {
+  isDragging.value = false;
+}
+
+// 处理拖拽文件
+function handleDrop(e: DragEvent) {
+  isDragging.value = false;
+  if (e.dataTransfer?.files) {
+    handleFiles(Array.from(e.dataTransfer.files));
+  }
+}
+
+// 添加全局拖拽阻止
+onMounted(() => {
+  document.addEventListener('dragover', (e) => {
+    // 检查是否在指定的拖拽区域内
+    const dropZone = e.target as Element;
+    if (!dropZone.closest('.drop-zone')) {
+      e.preventDefault();
+      e.dataTransfer!.effectAllowed = 'none';
+      e.dataTransfer!.dropEffect = 'none';
+    }
+  });
+
+  document.addEventListener('drop', (e) => {
+    // 检查是否在指定的拖拽区域内
+    const dropZone = e.target as Element;
+    if (!dropZone.closest('.drop-zone')) {
+      e.preventDefault();
+    }
+  });
+});
 </script>
 
 <style scoped>
@@ -231,7 +313,7 @@ function handleSendOrStop() {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
   border: 1px solid rgba(0, 0, 0, 0.05);
-  max-width: 850px;
+  max-width: 820px;
   margin: 0 auto;
 }
 
@@ -371,7 +453,6 @@ function handleSendOrStop() {
 }
 
 .file-name {
-  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -456,7 +537,14 @@ function handleSendOrStop() {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
+}
+
+.toolbar-right .tool-button {
+  margin: 0;
+  padding: 0;
+  width: 32px; /* 减小按钮尺寸 */
+  height: 32px;
 }
 
 /* 流式输出按钮样式 */
@@ -467,4 +555,24 @@ function handleSendOrStop() {
 .stream-inactive {
   color: #999 !important;
 }
+
+/* 联网搜索按钮样式 */
+.search-active {
+  color: var(--primary-color) !important;
+}
+
+.search-inactive {
+  color: #999 !important;
+}
+
+/* 简化拖拽区域样式 */
+.drop-zone {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.drop-zone.dragging .chat-input-wrapper {
+  border: 2px dashed var(--primary-color);
+}
+
 </style>
