@@ -258,7 +258,7 @@ pub async fn event(
         agent.context_size as usize * 2 + 1,
     )?;
     for message in contexts.iter() {
-        println!("Message: {:?}", message.role);
+        println!("Message: {:?}", message.content);
     }
 
     let Some(message) = contexts.pop() else {

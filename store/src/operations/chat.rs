@@ -252,12 +252,14 @@ impl Store {
             })
             .collect();
 
-        sorted_messages.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        sorted_messages.sort_by(|a, b| b.id.cmp(&a.id));
 
         // 限制返回数量
         if sorted_messages.len() > limit {
             sorted_messages.truncate(limit);
         }
+
+        sorted_messages.sort_by(|a, b| a.id.cmp(&b.id));
 
         Ok(sorted_messages)
     }

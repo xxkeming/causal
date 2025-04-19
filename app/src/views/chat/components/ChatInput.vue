@@ -27,7 +27,6 @@
                 class="native-file-input"
                 @change="handleFilesSelected" 
                 multiple
-                accept=".txt,.md,.json,.csv,.pdf,.doc,.docx,.xls,.xlsx"
               />
               
               <n-button class="tool-button" text @click="triggerFileInput">
@@ -125,7 +124,8 @@ import {
   GlobeOutline // 修改为正确的离线模式图标
 } from '@vicons/ionicons5';
 import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
-import { open } from "@tauri-apps/plugin-dialog";
+import { Attachment } from '../../../services/typings';
+import { convertFile } from '../../../services/api';
 
 const props = defineProps<{
   loading: boolean;
@@ -134,7 +134,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'send', text: string, files?: File[]): void;
+  (e: 'send', text: string, attachments?: Attachment[]): void;
   (e: 'update:stream', value: boolean): void;
   (e: 'update:search', value: boolean): void; // 添加事件
 }>();
@@ -142,6 +142,7 @@ const emit = defineEmits<{
 const inputMessage = ref('');
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedFiles = ref<File[]>([]);
+const selectedAttachments = ref<Attachment[]>([]);
 const message = useMessage();
 const isDragging = ref(false);
 
@@ -149,7 +150,7 @@ const isDragging = ref(false);
 const fileIconStore = useFileIconStore();
 
 const canSendMessage = computed(() => 
-  (inputMessage.value.trim() !== '' || selectedFiles.value.length > 0) && 
+  (inputMessage.value.trim() !== '' || selectedAttachments.value.length > 0) && 
   !props.loading
 );
 
@@ -175,29 +176,67 @@ function triggerFileInput() {
 }
 
 // 添加文件处理公共函数
-function handleFiles(files: File[]) {
+async function handleFiles(files: File[]) {
   if (files.length === 0) return;
   
   const maxSize = 10 * 1024 * 1024;
-  // 先过滤重复文件
-  const uniqueFiles = files.filter(file => 
-    !selectedFiles.value.some(existingFile => 
-      existingFile.name === file.name && 
-      existingFile.size === file.size
-    )
-  );
-  
-  if (uniqueFiles.length < files.length) {
-    message.warning(`已过滤${files.length - uniqueFiles.length}个重复文件`);
-  }
-  
-  const oversizedFiles = uniqueFiles.filter(file => file.size > maxSize);
-  if (oversizedFiles.length > 0) {
-    message.warning(`有${oversizedFiles.length}个文件超过10MB大小限制，已被过滤`);
-    const validFiles = uniqueFiles.filter(file => file.size <= maxSize);
+  // 过滤重复文件和大小限制
+  const validFiles = files.filter(file => {
+    const isDuplicate = selectedFiles.value.some(existingFile => 
+      existingFile.name === file.name && existingFile.size === file.size
+    );
+    const isOversize = file.size > maxSize;
+    
+    if (isDuplicate) {
+      message.warning(`文件 ${file.name} 已存在`);
+    }
+    if (isOversize) {
+      message.warning(`文件 ${file.name} 超过10MB大小限制`);
+    }
+    
+    return !isDuplicate && !isOversize;
+  });
+
+  if (validFiles.length === 0) return;
+
+  try {
+    // 转换为 Attachment 对象
+    const newAttachments = await Promise.all(validFiles.map(file => {
+      return new Promise<Attachment>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64Data = (reader.result as string).split(',')[1];
+            const attachment: Attachment = {
+              name: file.name,
+              size: file.size,
+              data: base64Data
+            };
+            resolve(attachment);
+        };
+        reader.onerror = () => reject(new Error(`读取文件失败: ${file.name}`));
+        reader.readAsDataURL(file);
+      });
+    }));
+
+    // 遍历附件, 然后转换
+    for (const attachment of newAttachments) {
+      try {
+        const data = await convertFile(attachment.name, attachment.data);
+        attachment.data = data;
+        attachment.size = data.length;
+      } catch (error) {
+        console.error('这种类型的附件暂不支持:', error);
+        message.error(`这种类型的附件暂不支持: ${attachment.name}`);
+        return;
+      }
+    }
+
     selectedFiles.value.push(...validFiles);
-  } else {
-    selectedFiles.value.push(...uniqueFiles);
+    selectedAttachments.value.push(...newAttachments);
+    message.success(`成功添加 ${newAttachments.length} 个文件`);
+  } catch (error) {
+    console.error('文件处理失败:', error);
+    message.error('文件处理失败');
   }
 }
 
@@ -213,11 +252,13 @@ function handleFilesSelected(event: Event) {
 // 移除特定文件
 function removeFile(index: number) {
   selectedFiles.value.splice(index, 1);
+  selectedAttachments.value.splice(index, 1);
 }
 
 // 清除所有已选择的文件
 function clearSelectedFiles() {
   selectedFiles.value = [];
+  selectedAttachments.value = [];
   if (fileInputRef.value) {
     fileInputRef.value.value = '';
   }
@@ -237,9 +278,9 @@ function handleKeyDown(e: KeyboardEvent) {
 // 发送消息
 function sendMessage() {
   const text = inputMessage.value.trim();
-  if ((!text && selectedFiles.value.length === 0) || props.loading) return;
+  if ((!text && selectedAttachments.value.length === 0) || props.loading) return;
   
-  emit('send', text, selectedFiles.value.length > 0 ? [...selectedFiles.value] : undefined);
+  emit('send', text, selectedAttachments.value.length > 0 ? [...selectedAttachments.value] : undefined);
   inputMessage.value = '';
   clearSelectedFiles();
 }
@@ -427,7 +468,7 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-left: 8px;
+  margin-left: 2px;
   overflow: hidden;
 }
 
@@ -435,9 +476,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   background-color: var(--n-color, rgba(24, 160, 88, 0.1));
-  border-radius: 16px;
-  padding: 4px 10px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 2px 4px;
+  font-size: 12px;
   color: var(--n-text-color, #333);
   transition: all 0.2s;
   border: 1px solid var(--n-border-color, rgba(24, 160, 88, 0.2));

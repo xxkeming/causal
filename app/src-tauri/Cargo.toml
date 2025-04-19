@@ -25,7 +25,7 @@ tokio = { version = "1", features = ["full"] }
 futures = "*"
 async-openai = "0.28.1"
 
-pandoc = "0.8.11"
+base64 = "0.22.1"
 
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -33,4 +33,5 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 store = { workspace = true }
+document = { workspace = true }
 tools = { workspace = true }

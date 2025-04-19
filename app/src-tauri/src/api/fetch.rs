@@ -1,9 +1,11 @@
+use base64::prelude::*;
+
 use crate::error;
 
 pub fn ftech(
     store: tauri::State<'_, store::Store>, name: &str, data: &str,
 ) -> Result<serde_json::Value, error::Error> {
-    println!("fetch, {} {}", name, data);
+    // println!("fetch, {} {}", name, data);
 
     match name {
         "provider.add" => {
@@ -235,22 +237,41 @@ pub fn ftech(
             Ok(serde_json::json!({ "status": "success" }))
         }
         "file.convert" => {
-            let path: String = serde_json::from_str(data)?;
-            let path = std::path::Path::new(&path);
-            if path.is_file() {
-                let mut pandoc = pandoc::new();
-                pandoc.add_input(path);
-                pandoc.set_output(pandoc::OutputKind::Pipe);
-                pandoc.set_output_format(pandoc::OutputFormat::Markdown, Vec::new());
+            #[derive(serde::Deserialize)]
+            struct Convert {
+                name: String,
+                data: String,
+            }
 
-                if let Ok(pandoc::PandocOutput::ToBuffer(data)) = pandoc.execute() {
-                    return Ok(serde_json::json!({ "status": "success", "data": data }));
+            let convert = serde_json::from_str::<Convert>(data)?;
+            let input = format!("/tmp/{}", convert.name);
+
+            if !document::is_loader(&input) {
+                println!("not support file type: {}", input);
+                return Ok(serde_json::json!({
+                    "status": "error",
+                    "message": "not support file type",
+                }));
+            }
+
+            // data 解码base64
+            let data = BASE64_STANDARD.decode(&convert.data)?;
+            std::fs::write(&input, data)?;
+
+            match document::loader_from_file(&input) {
+                Some(data) => {
+                    return Ok(serde_json::json!({
+                        "status": "success",
+                        "data": data,
+                    }));
+                }
+                None => {
+                    return Ok(serde_json::json!({
+                        "status": "error",
+                        "message": "convert failed",
+                    }));
                 }
             }
-            return Ok(serde_json::json!({
-                "status": "error",
-                "message": "not a file"
-            }));
         }
         _ => Err(error::Error::Unknown),
     }

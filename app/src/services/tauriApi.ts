@@ -91,11 +91,11 @@ export async function event_local(agentId: number, sessionId: number, messageId:
 }
 
 // 转换各种文档为md格式
-export async function convert(path: string) {
+export async function convert(name: string, data: string) {
   try {
-    console.log('convert:', path);
+    console.log('convert:', name);
 
-    let result = await invoke('convert', { path }) as Response;
+    let result = await invoke('convert', { name, data }) as Response;
     console.log('convert result:', result);
 
     if (result.status === "error") {

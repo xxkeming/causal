@@ -86,7 +86,7 @@ import { Agent, ChatMessage, ChatSession, Attachment } from '../../services/typi
 import { useAgentStore } from '../../stores/agentStore';
 import { useIconStore } from '../../stores/iconStore';
 import { useChatSessionStore } from '../../stores/chatSessionStore';
-import { chatEvent, MessageEvent, convertFile  } from '../../services/api';
+import { chatEvent, MessageEvent  } from '../../services/api';
 import * as api from '../../services/api';
 
 // 导入组件
@@ -220,10 +220,8 @@ function scrollToBottom() {
 }
 
 // 发送消息
-async function sendMessage(text: string, files?: File[]) {
-  if ((!text && (!files || files.length === 0)) || loading.value) return;
-
-  await convertFile("/Users/keming/Downloads/aaa.docx");
+async function sendMessage(text: string, attachments?: Attachment[]) {
+  if ((!text && (!attachments || attachments.length === 0)) || loading.value) return;
 
   if (agent.value === null) {
     message.error('请先选择智能体');
@@ -237,25 +235,6 @@ async function sendMessage(text: string, files?: File[]) {
 
   try {
     loading.value = true;
-
-    // 生成attachments数组, 给userMessage
-    // 如果有文件，读取内容并base64编码,添加到消息中
-    const attachments : Attachment[] | undefined = files ? await Promise.all(files.map(file => {
-      return new Promise<Attachment>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          // 过滤掉里面的前缀,只保留base64部分
-          const base64Data = (reader.result as string).split(',')[1];
-          // 解base64成字符串
-          const base64String = atob(base64Data);
-          resolve({ name: file.name, size: file.size, data: base64String});
-        };
-        reader.onerror = () => {
-          reject(new Error('文件读取失败:' + file.name));
-        };
-        reader.readAsDataURL(file);
-      });
-    })) : undefined;
 
     // 添加用户消息
     const userMessage = {

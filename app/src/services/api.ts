@@ -362,8 +362,8 @@ export async function chatEvent(agentId: number, sessionId: number, messageId: n
   return tauriApi.event_local(agentId, sessionId, messageId, search, stream, onData);
 }
 
-export async function convertFile(path: string): Promise<string> {
-  return tauriApi.fetch_local('file.convert', path) as Promise<string>;
+export async function convertFile(name: string, data: string): Promise<string> {
+  return tauriApi.fetch_local('file.convert', { name, data }) as Promise<string>;
 }
 
 // 导出Tauri相关API

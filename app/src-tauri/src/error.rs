@@ -15,6 +15,9 @@ pub enum Error {
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("base64 error: {0}")]
+    Base64(#[from] base64::DecodeError),
+
     #[error("Unknown data")]
     Unknown,
 }

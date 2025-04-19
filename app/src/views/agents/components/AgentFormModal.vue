@@ -241,8 +241,8 @@
               <div class="form-item-row">
                 <n-input-number
                   v-model:value="formModel.contextSize"
-                  :min="1"
-                  :max="20"
+                  :min="0"
+                  :max="50"
                   :style="{ width: '160px' }"
                 />
               </div>

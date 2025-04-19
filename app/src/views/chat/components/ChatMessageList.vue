@@ -645,11 +645,10 @@ function copyMessage(message: ChatMessage) {
   display: flex;
   align-items: center;
   background-color: #f0f0f0;
-  border-radius: 12px;
-  padding: 2px 8px;
+  border-radius: 10px;
+  padding: 2px 4px;
   font-size: 12px;
   color: #555;
-  max-width: 150px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
