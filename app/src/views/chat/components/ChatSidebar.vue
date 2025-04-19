@@ -84,27 +84,6 @@
       </div>
     </n-scrollbar>
     
-    <!-- 添加删除确认对话框 - 添加变换原点和上边距样式 -->
-    <n-modal
-      v-model:show="showDeleteConfirm"
-      preset="dialog"
-      title="删除会话"
-      positive-text="确认"
-      negative-text="取消"
-      @positive-click="handleDeleteConfirm"
-      @negative-click="cancelDelete"
-      type="error"
-      :transform-origin="'center'"
-      style="margin-top: 80px;"
-    >
-      <template #icon>
-        <n-icon color="#d03050">
-          <WarningOutline />
-        </n-icon>
-      </template>
-      确定要删除这个会话吗？此操作不可恢复。
-    </n-modal>
-
     <!-- 修改编辑主题的模态框，参考删除确认框的样式 -->
     <n-modal 
       v-model:show="editModalVisible" 
@@ -135,8 +114,11 @@
 
 <script setup lang="ts">
 import { computed, ref, nextTick, h } from 'vue';
-import { NLayoutSider, NIcon, NButton, NScrollbar, NAvatar, NModal, NInput, NTooltip, NDropdown } from 'naive-ui';
-import { AddOutline, TrashOutline, ServerOutline, WarningOutline, SearchOutline, CreateOutline, CopyOutline } from '@vicons/ionicons5';
+import { 
+  NLayoutSider, NIcon, NButton, NScrollbar, NAvatar, 
+  NModal, NInput, NTooltip, NDropdown, useDialog // 添加 useDialog
+} from 'naive-ui';
+import { AddOutline, TrashOutline, ServerOutline, SearchOutline, CreateOutline, CopyOutline } from '@vicons/ionicons5';
 import { ChatSession } from '../../../services/typings';
 import { useIconStore } from '../../../stores/iconStore';
 import { useAgentStore } from '../../../stores/agentStore';
@@ -204,30 +186,30 @@ const getAgentIconColor = (session: ChatSession) => {
   return '#18a058';
 };
 
-// 添加删除确认相关状态
-const showDeleteConfirm = ref(false);
-const sessionToDelete = ref<number | null>(null);
+// 添加 dialog
+const dialog = useDialog();
 
-// 显示删除确认对话框
-const confirmDeleteSession = (sessionId: number) => {
-  sessionToDelete.value = sessionId;
-  showDeleteConfirm.value = true;
-};
-
-// 确认删除
-const handleDeleteConfirm = () => {
-  if (sessionToDelete.value !== null) {
-    deleteSession(sessionToDelete.value);
-    sessionToDelete.value = null;
+// 修改确认删除函数
+async function confirmDeleteSession(sessionId: number) {
+  try {
+    await dialog.warning({
+      title: '删除会话',
+      content: '确定要删除这个会话吗？此操作不可恢复。',
+      positiveText: '确认',
+      negativeText: '取消',
+      type: 'error',
+      style: {
+        position: 'relative',
+        marginTop: '20vh'
+      },
+      onPositiveClick: async () => {
+        deleteSession(sessionId);
+      }
+    });
+  } catch (error) {
+    console.error('删除会话出错:', error);
   }
-  showDeleteConfirm.value = false;
-};
-
-// 取消删除
-const cancelDelete = () => {
-  sessionToDelete.value = null;
-  showDeleteConfirm.value = false;
-};
+}
 
 // 搜索关键词
 const searchKeyword = ref('');
@@ -333,7 +315,7 @@ const handleSelect = (key: string) => {
       emit('create', originalSession.agentId); // 直接使用原会话的agentId
       break;
     case 'delete':
-      confirmDeleteSession(selectedSessionId.value);
+      confirmDeleteSession(selectedSessionId.value); // 直接调用新的确认函数
       break;
   }
   showDropdown.value = false;

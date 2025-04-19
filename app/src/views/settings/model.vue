@@ -206,22 +206,6 @@
         </n-scrollbar>
       </n-layout>
     </n-layout>
-    
-    <!-- 删除确认对话框 -->
-    <n-modal
-      v-model:show="showDeleteConfirm"
-      preset="dialog"
-      title="确认删除"
-      content="确定要删除这个模型提供商吗？此操作不可恢复。"
-      positive-text="删除"
-      negative-text="取消"
-      @positive-click="deleteProvider"
-      @negative-click="showDeleteConfirm = false"
-    >
-      <template #icon>
-        <n-icon :component="WarningOutline" />
-      </template>
-    </n-modal>
   </div>
 </template>
 
@@ -245,15 +229,14 @@ import {
   NDivider,
   NTag,
   NSpin,
-  NModal,
   NPopover,
   FormRules,
-  useMessage
+  useMessage,
+  useDialog // 添加 useDialog
 } from 'naive-ui';
 import {
   AddOutline,
   TrashOutline,
-  WarningOutline,
   HelpCircleOutline // 添加帮助图标
 } from '@vicons/ionicons5';
 import { useProviderStore, ProviderApiCategory } from '../../stores/providerStore';
@@ -266,11 +249,11 @@ const currentProviderId = ref<number | null>(null);
 const isCreating = ref(false);
 const loadingDetails = ref(false);
 const saving = ref(false);
-const showDeleteConfirm = ref(false);
 const formRef = ref(null);
 
 // 获取消息 API
 const message = useMessage();
+const dialog = useDialog(); // 添加 dialog 实例
 
 // 获取提供商 Store
 const providerStore = useProviderStore();
@@ -443,36 +426,40 @@ function removeModel(index: number) {
   }
 }
 
-// 确认删除提供商
-function confirmDeleteProvider() {
-  showDeleteConfirm.value = true;
-}
-
-// 删除提供商
-async function deleteProvider() {
+// 修改确认删除函数
+async function confirmDeleteProvider() {
   if (!currentProviderId.value) return;
   
-  saving.value = true;
   try {
-    const success = await providerStore.removeProvider(currentProviderId.value);
-    if (success) {
-      message.success('提供商已删除');
-      
-      // 更新选中的提供商
-      if (providerStore.providers.length > 0) {
-        selectProvider(providerStore.providers[0].id);
-      } else {
-        currentProviderId.value = null;
-        isCreating.value = false;
+    await dialog.warning({
+      title: '确认删除',
+      content: '确定要删除这个模型提供商吗？此操作不可恢复。',
+      positiveText: '确认',
+      negativeText: '取消',
+      style: {
+        position: 'relative',
+        marginTop: '20vh'
+      },
+      onPositiveClick: async () => {
+        const success = await providerStore.removeProvider(currentProviderId.value as number);
+        if (success) {
+          message.success('提供商已删除');
+          
+          // 更新选中的提供商
+          if (providerStore.providers.length > 0) {
+            selectProvider(providerStore.providers[0].id);
+          } else {
+            currentProviderId.value = null;
+            isCreating.value = false;
+          }
+        } else {
+          throw new Error('删除提供商失败');
+        }
       }
-    } else {
-      message.error('删除提供商失败');
-    }
+    });
   } catch (error) {
-    console.error('Failed to delete provider:', error);
-    message.error('删除提供商时出错');
-  } finally {
-    saving.value = false;
+    console.error('删除提供商失败:', error);
+    message.error('删除提供商失败');
   }
 }
 

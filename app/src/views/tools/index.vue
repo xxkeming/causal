@@ -167,53 +167,12 @@
     </n-layout>
     
     <!-- 添加/编辑类别对话框 -->
-    <tool-category-add-modal
+    <tool-category-form-modal
       v-model:visible="showAddCategoryModal"
       :category="categoryToEditForModal"
       @submit="addNewCategory"
       @update="updateCategory"
     />
-    
-    <!-- 删除分类确认对话框 -->
-    <tool-category-delete-modal
-      v-model:visible="showDeleteCategoryModal"
-      :category="categoryToDelete"
-      @confirm="deleteCategory"
-    />
-    
-    <!-- 删除工具确认对话框 - 替换为组件 -->
-    <tool-delete-modal
-      v-model:visible="showDeleteToolModal"
-      :tool="toolToDelete"
-      @confirm="deleteTool"
-      @cancel="showDeleteToolModal = false"
-    />
-    
-    <!-- 工具表单模态框 -->
-    <n-modal v-model:show="showToolModal" style="width: 800px">
-      <n-card
-        :title="isEditingTool ? '编辑工具' : '创建工具'"
-        :bordered="false"
-        size="huge"
-        role="dialog"
-        aria-modal="true"
-      >
-        <n-empty description="工具表单待实现">
-          <template #extra>
-            <n-button @click="showToolModal = false">关闭</n-button>
-          </template>
-        </n-empty>
-      
-        <template #footer>
-          <div style="display: flex; justify-content: flex-end; gap: 12px;">
-            <n-button @click="showToolModal = false">取消</n-button>
-            <n-button type="primary" :loading="submittingTool">
-              {{ isEditingTool ? '保存' : '创建' }}
-            </n-button>
-          </div>
-        </template>
-      </n-card>
-    </n-modal>
   </div>
 </template>
 
@@ -223,7 +182,7 @@ import { useRouter } from 'vue-router'
 import { 
   NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
   NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
-  NEmpty, NSpace, NSpin, NModal, NTag, NTooltip
+  NEmpty, NSpace, NSpin, NTag, NTooltip, useDialog
 } from 'naive-ui';
 import { 
   AddOutline, SearchOutline, BuildOutline, CreateOutline, 
@@ -235,13 +194,12 @@ import { useToolStore } from '../../stores/toolStore';
 import { useToolCategoryStore } from '../../stores/toolCategoryStore';
 import { useIconStore } from '../../stores/iconStore';
 // 导入拆分的组件
-import ToolCategoryAddModal from './components/ToolCategoryAddModal.vue';
-import ToolCategoryDeleteModal from './components/ToolCategoryDeleteModal.vue';
-import ToolDeleteModal from './components/ToolDeleteModal.vue'; // 导入新组件
+import ToolCategoryFormModal from './components/ToolCategoryFormModal.vue';
 
 const router = useRouter()
 
 const message = useMessage();
+const dialog = useDialog(); // 添加 dialog
 
 // Store
 const toolStore = useToolStore();
@@ -252,14 +210,7 @@ const iconStore = useIconStore();
 const searchKeyword = ref<string>('');
 const selectedCategory = ref<number>(0);
 const showAddCategoryModal = ref<boolean>(false);
-const showDeleteCategoryModal = ref<boolean>(false);
-const showDeleteToolModal = ref<boolean>(false);
-const showToolModal = ref<boolean>(false);
-const isEditingTool = ref<boolean>(false);
-const categoryToDelete = ref<ToolCategory | null>(null);
-const toolToDelete = ref<Tool | null>(null);
-const submittingTool = ref<boolean>(false);
-const categoryToEdit = ref<ToolCategory | null>(null); // 添加分类编辑相关状态
+const categoryToEdit = ref<ToolCategory | null>(null);
 
 // Computed property to handle null-to-undefined conversion
 const categoryToEditForModal = computed(() => categoryToEdit.value || undefined);
@@ -305,31 +256,35 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString('zh-CN');
 }
 
-// 确认删除分类
-function confirmDeleteCategory(category: ToolCategory) {
-  categoryToDelete.value = category;
-  showDeleteCategoryModal.value = true;
-}
-
-// 删除分类
-async function deleteCategory() {
-  if (!categoryToDelete.value) return;
-  
+// 修改确认删除分类函数
+async function confirmDeleteCategory(category: ToolCategory) {
   try {
-    const success = await categoryStore.removeCategory(categoryToDelete.value.id);
-    if (success) {
-      await toolStore.removeToolByCategory(categoryToDelete.value.id);
-
-      // 如果当前选中的是被删除的类别，则切换到"所有智能体"
-      if (selectedCategory.value === categoryToDelete.value.id) {
-        selectedCategory.value = 0;
+    await dialog.warning({
+      title: '确认删除',
+      content: `是否删除类别"${category.name}"？该类别下的所有工具也将被删除，此操作不可恢复。`,
+      positiveText: '确认',
+      negativeText: '取消',
+      style: {
+        position: 'relative',
+        marginTop: '20vh'
+      },
+      onPositiveClick: async () => {
+        const success = await categoryStore.removeCategory(category.id);
+        if (success) {
+          await toolStore.removeToolByCategory(category.id);
+          
+          // 如果当前选中的是被删除的类别，则切换到"所有工具"
+          if (selectedCategory.value === category.id) {
+            selectedCategory.value = 0;
+          }
+          message.success('类别已删除');
+        } else {
+          throw new Error('删除类别失败');
+        }
       }
-      message.success('类别已删除');
-    } else {
-      message.error('删除类别失败');
-    }
+    });
   } catch (error) {
-    message.error('删除类别时发生错误');
+    message.error('删除类别失败');
   }
 }
 
@@ -370,28 +325,30 @@ function showToolFormModal() {
   router.push({ path: '/tools/edit', query });
 }
 
-// 确认删除工具
-function confirmDeleteTool(tool: Tool) {
-  toolToDelete.value = tool;
-  showDeleteToolModal.value = true;
-}
-
-// 删除工具
-async function deleteTool() {
-  if (!toolToDelete.value) return;
-  
+// 修改确认删除工具函数
+async function confirmDeleteTool(tool: Tool) {
   try {
-    const success = await toolStore.removeTool(toolToDelete.value.id);
-    if (success) {
-      message.success('工具已删除');
-    } else {
-      message.error('删除工具失败');
-    }
+    await dialog.warning({
+      title: '确认删除',
+      content: `是否删除工具"${tool.name}"？此操作不可恢复。`,
+      positiveText: '确认',
+      negativeText: '取消',
+      style: {
+        position: 'relative',
+        marginTop: '20vh'
+      },
+      onPositiveClick: async () => {
+        const success = await toolStore.removeTool(tool.id);
+        if (success) {
+          message.success('工具已删除');
+        } else {
+          throw new Error('删除工具失败');
+        }
+      }
+    });
   } catch (error) {
+    console.error('删除工具出错:', error);
     message.error('删除工具时发生错误');
-  } finally {
-    showDeleteToolModal.value = false;
-    toolToDelete.value = null;
   }
 }
 
@@ -483,7 +440,6 @@ onMounted(async () => {
 // 组件卸载时清理状态
 onBeforeUnmount(() => {
   categoryToEdit.value = null;
-  categoryToDelete.value = null;
 });
 </script>
 

@@ -160,18 +160,11 @@
       </n-layout>
     
       <!-- 添加/编辑类别对话框 -->
-      <agent-category-add-modal
+      <agent-category-form-modal
         v-model:visible="showAddCategoryModal"
         :category="categoryToEdit || undefined"
         @submit="addNewCategory"
         @update="updateCategory"
-      />
-    
-      <!-- 删除类别确认对话框 -->
-      <agent-category-delete-modal
-        v-model:visible="showDeleteCategoryModal"
-        :category="categoryToDelete"
-        @confirm="deleteCategory"
       />
     
       <!-- 智能体表单模态框 -->
@@ -183,14 +176,6 @@
         @submit="handleAgentFormSubmit"
         @cancel="handleAgentFormCancel"
       />
-
-      <!-- 替换为智能体删除确认组件 -->
-      <agent-delete-modal
-        v-model:visible="showDeleteAgentModal"
-        :agent="agentToDelete"
-        @confirm="deleteAgent"
-        @cancel="cancelDeleteAgent"
-      />
     </div>
   </template>
 
@@ -199,7 +184,7 @@
   import { 
     NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
     NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
-    NEmpty, NSpace, NSpin, NTooltip
+    NEmpty, NSpace, NSpin, NTooltip, useDialog // 添加 useDialog
   } from 'naive-ui';
   import { 
     ServerOutline, AddOutline, SearchOutline, 
@@ -211,12 +196,11 @@
   import { useAgentCategoryStore } from '../../stores/agentCategoryStore';
   // 导入组件
   import AgentFormModal from './components/AgentFormModal.vue';
-  import AgentCategoryAddModal from './components/AgentCategoryAddModal.vue';
-  import AgentCategoryDeleteModal from './components/AgentCategoryDeleteModal.vue';
-  import AgentDeleteModal from './components/AgentDeleteModal.vue'; // 导入智能体删除组件
+  import AgentCategoryFormModal from './components/AgentCategoryFormModal.vue';
   import { useIconStore } from '../../stores/iconStore';
 
   const message = useMessage();
+  const dialog = useDialog(); // 添加 dialog
 
   // 使用Store
   const agentStore = useAgentStore();
@@ -227,8 +211,6 @@
   const searchKeyword = ref<string>('');
   const selectedCategory = ref<number>(0);
   const showAddCategoryModal = ref<boolean>(false);
-  const showDeleteCategoryModal = ref<boolean>(false);
-  const categoryToDelete = ref<AgentCategory | null>(null);
   const categoryToEdit = ref<AgentCategory | null>(null);
 
   // 计算属性 - 同时处理分类筛选和关键词搜索
@@ -271,36 +253,35 @@
     return date.toLocaleDateString('zh-CN');
   }
 
-  // 显示删除类别确认对话框
-  function confirmDeleteCategory(category: AgentCategory) {
-    categoryToDelete.value = category;
-    showDeleteCategoryModal.value = true;
-  }
-
-  // 删除类别
-  async function deleteCategory() {
-    if (!categoryToDelete.value) return;
-  
-    const categoryId = categoryToDelete.value.id;
-  
+  // 显示删除类别确认对话框 - 修改为使用 dialog
+  async function confirmDeleteCategory(category: AgentCategory) {
     try {
-      const success = await categoryStore.removeCategory(categoryId);
-      if (success) {
-        await agentStore.removeAgentByCategory(categoryId);
-
-        // 如果当前选中的是被删除的类别，则切换到"所有智能体"
-        if (selectedCategory.value === categoryId) {
-          selectedCategory.value = 0;
+      await dialog.warning({
+        title: '确认删除',
+        content: `是否删除类别"${category.name}"？该类别下的所有智能体也将被删除，此操作不可恢复。`,
+        positiveText: '确认',
+        negativeText: '取消',
+        style: {
+          position: 'relative',
+          marginTop: '20vh'
+        },
+        onPositiveClick: async () => {
+          const success = await categoryStore.removeCategory(category.id);
+          if (success) {
+            await agentStore.removeAgentByCategory(category.id);
+            
+            // 如果当前选中的是被删除的类别，则切换到"所有智能体"
+            if (selectedCategory.value === category.id) {
+              selectedCategory.value = 0;
+            }
+            message.success('类别已删除');
+          } else {
+            throw new Error('删除类别失败');
+          }
         }
-        message.success('类别已删除');
-      } else {
-        message.error('删除类别失败');
-      }
+      });
     } catch (error) {
-      message.error('删除类别时发生错误');
-    } finally {
-      showDeleteCategoryModal.value = false;
-      categoryToDelete.value = null;
+      message.error('删除类别失败');
     }
   }
 
@@ -393,44 +374,31 @@
     await agentStore.fetchAllAgents();
   });
 
-  // 添加智能体删除相关状态
-  const showDeleteAgentModal = ref(false);
-  const agentToDelete = ref<Agent | null>(null);
-
-  // 确认删除智能体 - 更新为使用组件
-  function confirmDeleteAgent(agent: Agent) {
-    agentToDelete.value = agent;
-    showDeleteAgentModal.value = true;
-  }
-
-  // 执行删除智能体
-  async function deleteAgent() {
-    if (!agentToDelete.value || !agentToDelete.value.id) {
-      message.error('删除失败：无效的智能体');
-      return;
-    }
-
+  // 确认删除智能体 - 更新为使用 dialog
+  async function confirmDeleteAgent(agent: Agent) {
     try {
-      const success = await agentStore.removeAgent(agentToDelete.value.id);
-      if (success) {
-        message.success('智能体已删除');
-      } else {
-        message.error('删除智能体失败');
-      }
+      await dialog.warning({
+        title: '确认删除',
+        content: `是否删除智能体"${agent.name}"？此操作不可恢复。`,
+        positiveText: '确认',
+        negativeText: '取消',
+        style: {
+          position: 'relative',
+          marginTop: '20vh'
+        },
+        onPositiveClick: async () => {
+          const success = await agentStore.removeAgent(agent.id);
+          if (success) {
+            message.success('智能体已删除');
+          } else {
+            throw new Error('删除智能体失败');
+          }
+        }
+      });
     } catch (error) {
       console.error('删除智能体出错:', error);
       message.error('删除智能体时发生错误');
-    } finally {
-      // 重置状态
-      showDeleteAgentModal.value = false;
-      agentToDelete.value = null;
     }
-  }
-
-  // 取消删除智能体
-  function cancelDeleteAgent() {
-    showDeleteAgentModal.value = false;
-    agentToDelete.value = null;
   }
 
   // 打开编辑分类对话框
@@ -471,7 +439,6 @@
   // 组件卸载时清理状态
   onBeforeUnmount(() => {
     categoryToEdit.value = null;
-    categoryToDelete.value = null;
   });
 
   </script>

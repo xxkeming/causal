@@ -35,7 +35,7 @@
             :agent-description="agent?.description"
             :agent-icon="agentIcon"
             :loading="loading"
-            :suggested-prompts="suggestedPrompts"
+            :suggested-prompts="customQuestions"
             @retry="retryMessage"
             @delete="deleteMessage"
             @send="sendMessage"
@@ -144,11 +144,9 @@ const agentIcon = computed(() => {
 });
 
 // 建议问题
-const suggestedPrompts = ref([
-  '你能做什么?',
-  '请介绍一下你自己',
-  '帮我写一个简单的Python程序'
-]);
+const customQuestions = computed(() => 
+  agent.value?.customQuestions || []
+);
 
 // 加载当前会话的消息
 async function loadSessionMessages(sessionId: number) {
@@ -225,11 +223,6 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
 
   if (agent.value === null) {
     message.error('请先选择智能体');
-    return;
-  }
-
-  if (currentSessionId.value === null) {
-    message.error('请先选择会话');
     return;
   }
 
