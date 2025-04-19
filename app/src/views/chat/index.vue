@@ -22,7 +22,8 @@
             :agent-icon="agentIcon"
             v-model:selected-model-value="selectedModelValue"
             @toggle-sidebar="toggleSidebar"
-            @show-config="showAgentConfig"
+            @show-agent-config="showAgentConfig"
+            @show-provider-config="showProviderConfig"
             @clear-session="clearSession"
             @close-session="closeSession"
             @model-change="handleModelChange"
@@ -73,6 +74,28 @@
       :agent-data="agent"
       @submit="handleAgentConfigSubmit"
     />
+
+    <!-- 修改模型提供商配置模态框 -->
+    <n-modal 
+      v-model:show="providerConfigVisible"
+      preset="card"
+      class="provider-modal"
+      :closable="false"
+      style="max-width: 900px; width: 95%; margin-top: 50px"
+      :style="{ 
+        '--n-modal-margin-top': '50px', 
+        '--n-modal-transform-origin': 'center top'
+      }"
+    >
+      <provider-form
+        v-if="currentProvider"
+        :provider="currentProvider"
+        :is-edit="true"
+        :embedded="false"
+        @submit="handleProviderSubmit"
+        @cancel="providerConfigVisible = false"
+      />
+    </n-modal>
   </div>
 </template>
 
@@ -80,12 +103,13 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
-  NLayout, useMessage, useDialog // 添加 useDialog
+  NLayout, NModal, useMessage, useDialog // 添加 NModal 和 useDialog
 } from 'naive-ui';
-import { Agent, ChatMessage, ChatSession, Attachment } from '../../services/typings';
+import { Agent, ChatMessage, ChatSession, Attachment, Provider } from '../../services/typings';
 import { useAgentStore } from '../../stores/agentStore';
 import { useIconStore } from '../../stores/iconStore';
 import { useChatSessionStore } from '../../stores/chatSessionStore';
+import { useProviderStore} from '../../stores/providerStore';
 import { chatEvent, MessageEvent  } from '../../services/api';
 import * as api from '../../services/api';
 
@@ -97,6 +121,7 @@ import AgentSelector from '../../components/AgentSelector.vue';
 import ChatMessageList from './components/ChatMessageList.vue';
 import NoSessionsAgentGrid from './components/NoSessionsAgentGrid.vue';
 import ChatInput from './components/ChatInput.vue'; // 导入新的输入组件
+import ProviderForm from '../settings/components/ProviderForm.vue'; // 导入 ProviderForm 组件
 
 // 强制刷新
 const forceUpdate = ref(0);
@@ -117,6 +142,7 @@ const dialog = useDialog(); // 在 setup 中添加 dialog
 const agentStore = useAgentStore();
 const iconStore = useIconStore();
 const chatSessionStore = useChatSessionStore();
+const providerStore = useProviderStore(); // 添加 providerStore
 
 // 本地状态管理会话和消息
 const currentSessionId = ref<number | null>(null);
@@ -129,6 +155,8 @@ const loading = ref(false);
 const siderCollapsed = ref(false);
 const stream = ref(true); // 添加stream状态
 const search = ref(false); // 添加联网搜索状态
+const providerConfigVisible = ref(false); // 添加状态
+const currentProvider = ref<Provider | undefined>(undefined); // 添加状态
 
 // 计算属性
 const hasActiveSession = computed(() => 
@@ -529,6 +557,53 @@ function showAgentConfig() {
   agentConfigVisible.value = true;
 }
 
+// 修改模型提供商配置函数
+async function showProviderConfig() {
+  if (agent.value?.model?.id) {
+    try {
+      // 获取提供商详情
+      const provider = await providerStore.fetchProviderById(agent.value.model.id);
+      if (provider) {
+        currentProvider.value = provider;
+        providerConfigVisible.value = true;
+      } else {
+        message.error('获取提供商信息失败');
+      }
+    } catch (error) {
+      console.error('加载提供商失败:', error);
+      message.error('加载提供商配置失败');
+    }
+  }
+}
+
+// 处理提供商配置提交
+async function handleProviderSubmit(provider: Partial<Provider>) {
+  try {
+    if (!currentProvider.value?.id) {
+      message.error('提供商ID不存在');
+      return;
+    }
+    
+    const updatedProvider: Provider = {
+      id: currentProvider.value.id,
+      name: provider.name || '',
+      apiCategory: provider.apiCategory || '',
+      url: provider.url || '',
+      apiKey: provider.apiKey,
+      models: provider.models || []
+    };
+    
+    await providerStore.modifyProvider(updatedProvider);
+    message.success('更新提供商配置成功');
+    providerConfigVisible.value = false;
+    // 重新加载智能体信息以更新模型列表
+    await loadAgentInfo();
+  } catch (error) {
+    console.error('更新提供商失败:', error);
+    message.error('更新提供商失败');
+  }
+}
+
 // 配置提交
 async function handleAgentConfigSubmit(updatedAgent: Agent) {
   try {
@@ -675,5 +750,20 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   background-color: var(--surface-color, #ffffff);
+}
+
+/* 添加提供商模态框样式 */
+:deep(.provider-modal) {
+  background-color: var(--surface-color, #fff);
+  margin-top: 20vh;
+}
+
+:deep(.provider-modal .n-card) {
+  background-color: var(--surface-color, #fff);
+  margin-top: 50px !important;
+}
+
+:deep(.provider-modal) :deep(.n-modal-container) {
+  align-items: flex-start !important;
 }
 </style>

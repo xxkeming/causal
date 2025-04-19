@@ -241,12 +241,48 @@
               <div class="form-item-row">
                 <n-input-number
                   v-model:value="formModel.contextSize"
+                  :on-update:value="val => {
+                    formModel.contextSize = val ?? 0;
+                    if (formModel.contextSize === 0) {
+                      formModel.contextExtend = false; // 如果设置为0，自动关闭记忆保留
+                    }
+                  }"
                   :min="0"
                   :max="50"
                   :style="{ width: '160px' }"
                 />
               </div>
             </n-form-item>
+
+            <n-form-item>
+              <template #label>
+                <div class="label-with-help">
+                  <n-popover trigger="hover" placement="top">
+                    <template #trigger>
+                      <n-icon size="16" class="help-icon">
+                        <HelpCircleOutline />
+                      </n-icon>
+                    </template>
+                    <div class="popover-content">
+                      启用后会在上下文中保留上传的附件数据，消耗更多token但能增强连续性
+                    </div>
+                  </n-popover>
+                  <span style="margin-left: 8px;">记忆保留附件</span>
+                </div>
+              </template>
+              <div class="form-item-row">
+                <n-switch 
+                  v-model:value="formModel.contextExtend"
+                  :on-update:value="val => {
+                    formModel.contextExtend = val;
+                    if (val && formModel.contextSize === 0) {
+                      formModel.contextSize = 5; // 如果开启且记忆为0,自动设置为默认值
+                    }
+                  }"
+                />
+              </div>
+            </n-form-item>
+
           </n-form>
         </n-tab-pane>
         
@@ -363,6 +399,81 @@
             </div>
           </n-scrollbar>
         </n-tab-pane>
+        
+        <!-- 添加自定义问题标签页 -->
+        <n-tab-pane name="questions" tab="自定义问题">
+          <div class="tab-header-with-tooltip">
+            <div class="tab-header-title">
+              <n-icon size="18" class="tab-header-icon"><ChatbubbleOutline /></n-icon>
+              <span>设置常用问题，让用户快速了解智能体的功能和特点。</span>
+            </div>
+          </div>
+
+          <n-scrollbar style="max-height: 400px">
+            <div class="questions-list">
+              <!-- 问题列表 -->
+              <div v-for="(_question, index) in formModel.customQuestions" :key="index" class="question-item">
+                <div class="question-fields-row">
+                  <div class="question-title">
+                    <n-text strong>{{ index + 1 }}</n-text>
+                  </div>
+                  
+                  <n-input 
+                    v-model:value="formModel.customQuestions[index]" 
+                    type="text"
+                    placeholder="输入常用问题" 
+                    class="question-input"
+                  />
+                  
+                  <n-button
+                    circle
+                    quaternary
+                    type="error"
+                    size="small"
+                    @click="removeQuestion(index)"
+                    class="delete-button"
+                  >
+                    <template #icon><n-icon><TrashOutline /></n-icon></template>
+                  </n-button>
+                </div>
+              </div>
+              
+              <!-- 添加问题输入框 -->
+              <div class="question-item question-inline-add">
+                <div class="question-fields-row new-question-row">
+                  <div class="question-title">
+                    <n-text type="info">+</n-text>
+                  </div>
+                  
+                  <n-input 
+                    v-model:value="newQuestion"
+                    type="text"
+                    placeholder="添加新的常用问题" 
+                    class="question-input"
+                    @keyup.enter="addQuestion"
+                  />
+                  
+                  <n-button 
+                    circle 
+                    type="primary"
+                    size="small"
+                    @click="addQuestion"
+                    :disabled="!newQuestion"
+                    class="inline-add-button"
+                    title="添加问题"
+                  >
+                    <template #icon><n-icon><AddOutline /></n-icon></template>
+                  </n-button>
+                </div>
+              </div>
+
+              <!-- 提示文本 -->
+              <div v-if="formModel.customQuestions.length === 0" class="no-questions-tip">
+                <n-text depth="3">还没有自定义问题，请添加常见问题</n-text>
+              </div>
+            </div>
+          </n-scrollbar>
+        </n-tab-pane>
       </n-tabs>
     </n-scrollbar>
   </n-modal>
@@ -373,13 +484,13 @@ import { ref, reactive, computed, watch } from 'vue';
 import {
   NModal, NButton, NForm, NFormItem, NInput, NInputNumber,
   NSelect, NIcon, NSlider, NText,
-  NScrollbar, NTabs, NTabPane,
+  NScrollbar, NTabs, NTabPane, NSwitch,
   NPopover, useMessage
 } from 'naive-ui';
 import { 
   AddOutline, TrashOutline, HelpCircleOutline,
   SettingsOutline, OptionsOutline, BuildOutline, CodeOutline,
-  AddCircleOutline, CreateOutline
+  AddCircleOutline, CreateOutline, ChatbubbleOutline
 } from '@vicons/ionicons5';
 import { Agent, ModelParam, ProviderModel } from '../../../services/typings';
 import { useAgentCategoryStore } from '../../../stores/agentCategoryStore';
@@ -430,8 +541,10 @@ const formModel = reactive<{
   temperature: number;
   maxTokens: number;
   contextSize: number;
+  contextExtend: boolean;
   tools: number[];
   params: ModelParam[];
+  customQuestions: string[];
 }>({
   name: '',
   description: '',
@@ -441,8 +554,10 @@ const formModel = reactive<{
   temperature: 0.7,
   maxTokens: 0,
   contextSize: 5,
+  contextExtend: false,
   tools: [],
-  params: []
+  params: [],
+  customQuestions: []
 });
 
 // 添加模型选择器相关状态
@@ -520,6 +635,26 @@ function addInlineParam() {
   newParam.name = '';
   newParam.type = 'string';
   newParam.value = '';
+}
+
+// 新问题输入框的值
+const newQuestion = ref('');
+
+// 添加问题方法
+function addQuestion() {
+  if (!newQuestion.value) return;
+  
+  if (!formModel.customQuestions) {
+    formModel.customQuestions = [];
+  }
+  
+  formModel.customQuestions.push(newQuestion.value);
+  newQuestion.value = '';
+}
+
+// 删除问题方法
+function removeQuestion(index: number) {
+  formModel.customQuestions.splice(index, 1);
 }
 
 // 表单引用
@@ -636,8 +771,11 @@ watch(() => props.visible, (visible) => {
     formModel.temperature = 0.7;
     formModel.maxTokens = 0;
     formModel.contextSize = 5;
+    formModel.contextExtend = false;
     formModel.tools = [];
     formModel.params = [];
+    formModel.customQuestions = [];
+    newQuestion.value = '';
     
     // 重置模型选择器值
     selectedModelValue.value = undefined;
@@ -658,6 +796,7 @@ watch(() => props.visible, (visible) => {
     formModel.temperature = props.agentData.temperature;
     formModel.maxTokens = props.agentData.maxTokens;
     formModel.contextSize = props.agentData.contextSize;
+    formModel.contextExtend = props.agentData.contextExtend || false;
     formModel.tools = props.agentData.tools || [];
     formModel.params = props.agentData.params ? props.agentData.params.map(p => ({
       name: p.name,
@@ -666,6 +805,7 @@ watch(() => props.visible, (visible) => {
       description: '',
       required: false
     })) : [];
+    formModel.customQuestions = props.agentData.customQuestions || [];
     
     if (props.agentData.model && props.agentData.model.id !== undefined && props.agentData.model.name) {
       selectedModelValue.value = props.agentData.model.id + '|' + props.agentData.model.name;
@@ -1070,5 +1210,52 @@ html.dark .prompt-character-count {
   font-size: 13px;
   line-height: 1.6;
   max-width: 300px;
+}
+
+/* 添加自定义问题相关样式 */
+.questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.question-item {
+  transition: transform 0.2s;
+}
+
+.question-fields-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+  background-color: var(--card-color);
+  padding: 4px;
+}
+
+.new-question-row {
+  border: 1px dashed var(--border-color);
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+.new-question-row:hover {
+  background-color: rgba(24, 160, 88, 0.03);
+}
+
+.question-title {
+  width: 30px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.question-input {
+  flex: 1;
+}
+
+.no-questions-tip {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-color-3);
 }
 </style>

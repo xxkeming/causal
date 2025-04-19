@@ -21,7 +21,7 @@
         <template #trigger>
           <n-button quaternary circle class="agent-button" 
             :style="{ backgroundColor: agentIcon?.color || '#18a058', color: 'white' }"
-             @click="onShowConfig"
+             @click="onShowAgentConfig"
           >
             <n-icon size="20">
               <component :is="agentIcon?.icon || ServerOutline" />
@@ -45,7 +45,7 @@
       <!-- 配置按钮 -->
       <n-tooltip trigger="hover">
         <template #trigger>
-          <n-button class="action-button" circle tertiary size="small" @click="onModelConfig">
+          <n-button class="action-button" circle tertiary size="small" @click="onProviderConfig">
             <n-icon><SettingsOutline /></n-icon>
           </n-button>
         </template>
@@ -77,7 +77,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRouter } from 'vue-router';
 import { 
   NIcon, NButton, NTooltip, NSpace
 } from 'naive-ui';
@@ -98,7 +97,8 @@ const props = defineProps<{
 // 定义事件 (移除 switch-agent 事件)
 const emit = defineEmits<{
   'toggle-sidebar': [];
-  'show-config': [];
+  'show-agent-config': [];
+  'show-provider-config': [];
   'clear-session': [];
   'close-session': [];
   'update:selectedModelValue': [value: string | undefined];
@@ -111,16 +111,10 @@ const modelValue = computed({
   set: (value) => emit('update:selectedModelValue', value)
 });
 
-const router = useRouter();
-
 // 事件处理函数 (移除 onSwitchAgent 函数)
 const toggleSidebar = () => emit('toggle-sidebar');
-const onShowConfig = () => emit('show-config');
-const onModelConfig = () => {
-  if (props.agent?.model?.id) {
-    router.push(`settings/model?providerId=${props.agent.model.id}`);
-  }
-};
+const onShowAgentConfig = () => emit('show-agent-config');
+const onProviderConfig = () => emit('show-provider-config');
 const onClearSession = () => emit('clear-session');
 const onCloseSession = () => emit('close-session');
 const onModelChange = (model: any) => emit('model-change', model);

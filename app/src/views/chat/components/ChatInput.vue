@@ -349,7 +349,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background-color: #fff;
+  background-color: rgba(247, 248, 250, 0.95);  /* 修改为浅灰色背景 */
   padding: 4px 6px;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -366,7 +366,6 @@ onMounted(() => {
 
 .chat-input {
   flex: 1;
-  padding: 0px 6px;
 }
 
 .chat-input :deep(.n-input__border),
@@ -375,13 +374,12 @@ onMounted(() => {
 }
 
 .chat-input :deep(.n-input-wrapper) {
-  padding: 0px 6px;
-  background-color: #fff;
+  padding: 0px 12px;
+  background-color: rgba(247, 248, 250, 0.95);  /* 修改为与容器相同的背景色 */
 }
 
 .chat-input :deep(textarea) {
   line-height: 1.5;
-  background-color: transparent;
   font-size: 15px; /* 调整字体大小 */
 }
 
@@ -488,22 +486,10 @@ onMounted(() => {
   background-color: var(--n-color-hover, rgba(24, 160, 88, 0.15));
 }
 
-.file-icon {
-  font-size: 15px;
-  margin-right: 6px;
-  opacity: 0.8;
-}
-
-.file-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .file-remove-btn {
   width: 18px;
   height: 18px;
-  margin-left: 6px;
+  margin-left: 2px;
   padding: 0;
   color: var(--n-close-icon-color, rgba(24, 160, 88, 0.6));
   transition: all 0.2s;
@@ -546,15 +532,6 @@ onMounted(() => {
   display: none;
 }
 
-.file-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background-color: #eaeaea;
-}
-
 .file-name {
   font-size: 13px;
   color: #333;
@@ -563,12 +540,6 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-right: 8px;
-}
-
-.files-count {
-  font-size: 13px;
-  color: #666;
-  margin-left: 8px;
 }
 
 .file-icon {
