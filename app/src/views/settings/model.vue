@@ -46,7 +46,7 @@
       <!-- 右侧内容区域改用新组件 -->
       <n-layout position="absolute" style="left: 220px; right: 0;" class="provider-content">
         <n-scrollbar class="scrollbar-container">
-          <n-spin :show="loadingDetails">
+          <n-spin :show="providerStore.loading">
             <n-empty 
               v-if="!currentProvider && !isCreating" 
               description="请选择或创建模型提供商" 
@@ -88,7 +88,6 @@ const message = useMessage();
 // 组件状态
 const currentProvider = ref<Provider | undefined>(undefined);
 const isCreating = ref(false);
-const loadingDetails = ref(false);
 
 // Store
 const providerStore = useProviderStore();
@@ -170,7 +169,6 @@ function getApiCategoryTagType(category: string): 'success' | 'info' | 'warning'
 
 // 初始化
 onMounted(async () => {
-  loadingDetails.value = true;
   try {
     await providerStore.fetchAllProviders();
     
@@ -184,8 +182,6 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to fetch providers:', error);
     message.error('加载提供商列表出错');
-  } finally {
-    loadingDetails.value = false;
   }
 });
 </script>

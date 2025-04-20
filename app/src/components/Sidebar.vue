@@ -128,7 +128,7 @@ const isSettingsActive = computed(() => {
 
 const setActive = (icon: string) => {
   // 如果正在测试中，阻止导航并显示提示
-  if (globalStore.isTesting) {
+  if (globalStore.isLoading) {
     const { message } = createDiscreteApi(['message']);
     message.warning('测试正在进行中，请等待测试完成后再进行操作');
     return;
@@ -144,9 +144,9 @@ const setActive = (icon: string) => {
 // 处理设置菜单的选择
 const handleSettingsSelect = (key: string) => {
   // 如果正在测试中，阻止导航并显示提示
-  if (globalStore.isTesting) {
+  if (globalStore.isLoading) {
     const { message } = createDiscreteApi(['message']);
-    message.warning('测试正在进行中，请等待测试完成后再进行操作');
+    message.warning('请等待任务完成后再进行操作');
     return;
   }
   

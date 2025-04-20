@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { useGlobalStore } from './globalStore';
 import { KnowledgeBase } from '../services/typings';
 import { 
   getAllKnowledgeBases, getKnowledgeBaseById,
@@ -7,15 +8,13 @@ import {
 } from '../services/api';
 
 export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
-  // 状态
+  const globalStore = useGlobalStore();
   const knowledgeBases = ref<KnowledgeBase[]>([]);
-  const loading = ref(false);
   const error = ref<string | null>(null);
   const needRefresh = ref(true);
   
-  // 获取所有知识库
   async function fetchAllKnowledgeBases() {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -27,13 +26,12 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       console.error('Failed to fetch knowledge bases:', err);
       error.value = '获取知识库失败';
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
-  // 获取单个知识库详情
   async function fetchKnowledgeBaseById(id: string) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -44,13 +42,12 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       error.value = '获取知识库详情失败';
       return null;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
-  // 创建知识库
   async function createKnowledgeBase(knowledgeBaseData: Omit<KnowledgeBase, 'id' | 'createdAt'>) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -62,13 +59,12 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       error.value = '创建知识库失败';
       throw err;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
-  // 更新知识库
   async function modifyKnowledgeBase(knowledgeBaseData: KnowledgeBase) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -83,13 +79,12 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       error.value = '更新知识库失败';
       throw err;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
-  // 删除知识库
   async function removeKnowledgeBase(id: string) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -103,18 +98,17 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       error.value = '删除知识库失败';
       return false;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
-  // 设置需要刷新标志
   function setNeedRefresh() {
     needRefresh.value = true;
   }
   
   return {
     knowledgeBases,
-    loading,
+    loading: globalStore.isLoading,
     error,
     needRefresh,
     fetchAllKnowledgeBases,

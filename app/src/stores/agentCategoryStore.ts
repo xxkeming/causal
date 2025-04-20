@@ -2,20 +2,21 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { AgentCategory } from '../services/typings';
 import { getAgentCategories, addAgentCategory, updateAgentCategory, deleteAgentCategory } from '../services/api';
+import { useGlobalStore } from './globalStore';
 
 export const useAgentCategoryStore = defineStore('agentCategory', () => {
+  const globalStore = useGlobalStore();
+  
   // 状态
   const categories = ref<AgentCategory[]>([]);
-  const loading = ref(false);
   const error = ref<string | null>(null);
   
   // 获取所有智能体类别
   async function fetchCategories() {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
-      // 移除条件判断，始终获取最新数据
       if (categories.value.length === 0) {
         categories.value = await getAgentCategories();
       }
@@ -23,37 +24,35 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
       console.error('Failed to fetch agent categories:', err);
       error.value = '获取类别失败';
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 添加智能体类别
   async function addCategory(name: string) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
       await addAgentCategory({ name });
-      // 直接添加到本地数组，确保界面立即更新
       categories.value = await getAgentCategories();
     } catch (err) {
       console.error('Failed to add agent category:', err);
       error.value = '添加类别失败';
       throw err;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 删除智能体类别
   async function removeCategory(categoryId: number) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
       const success = await deleteAgentCategory(categoryId);
       if (success) {
-        // 删除成功后更新本地数组
         categories.value = categories.value.filter(c => c.id !== categoryId);
       }
       return success;
@@ -62,21 +61,16 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
       error.value = '删除类别失败';
       return false;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
 
-  /**
-   * 更新智能体类别
-   */
   async function updateCategory(category: AgentCategory): Promise<boolean> {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     try {
-      // 调用API更新类别
       const result = await updateAgentCategory(category);
       
       if (result) {
-        // 更新本地状态
         const index = categories.value.findIndex(c => c.id === category.id);
         if (index !== -1) {
           categories.value[index] = category;
@@ -88,13 +82,13 @@ export const useAgentCategoryStore = defineStore('agentCategory', () => {
       console.error('Failed to update category:', error);
       return false;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   return {
     categories,
-    loading,
+    loading: globalStore.isLoading,
     error,
     fetchCategories,
     addCategory,

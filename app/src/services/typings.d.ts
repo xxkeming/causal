@@ -232,6 +232,9 @@ export interface ChatMessage {
 
   status: string;
 
+  // 反馈 默认 = 0, 赞 = 1, 踩 = 2
+  feedback?: number;
+
   // 耗时
   cost?: number;
 

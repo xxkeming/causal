@@ -67,6 +67,10 @@ pub struct ChatMessage {
     /// 状态
     pub status: MessageStatus,
 
+    /// 反馈 默认 = 0, 赞 = 1, 踩 = 2
+    #[serde(default)]
+    pub feedback: u32,
+
     /// 耗时
     pub cost: Option<i64>,
 

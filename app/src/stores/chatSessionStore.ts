@@ -11,7 +11,7 @@ export const useChatSessionStore = defineStore('chatSession', () => {
   /**
    * 初始化加载所有会话数据
    */
-  async function initialize() {
+  async function fetchAllSessions() {
     if (initialized.value) return;
     
     loading.value = true;
@@ -188,7 +188,7 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     loading,
     initialized,
     recentSessions,
-    initialize,
+    fetchAllSessions,
     getSessionById,
     getSessionsByAgentId,
     createNewSession,

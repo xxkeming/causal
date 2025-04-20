@@ -1,38 +1,39 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Agent } from '../services/typings';
+import { useGlobalStore } from './globalStore';
 import { 
   getAllAgents,
-  addAgent, updateAgent, deleteAgent ,deleteAgentByCategory
+  addAgent, updateAgent, deleteAgent, deleteAgentByCategory
 } from '../services/api';
 
 export const useAgentStore = defineStore('agent', () => {
+  const globalStore = useGlobalStore();
+  
   // 状态
   const agents = ref<Agent[]>([]);
-  const loading = ref(false);
   const error = ref<string | null>(null);
   
   // 获取所有智能体 - 作为主要的数据获取方法
   async function fetchAllAgents() {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
       if (agents.value.length === 0) {
-        // 如果本地列表为空，则直接获取
         agents.value = await getAllAgents();
       }
     } catch (err) {
       console.error('Failed to fetch agents:', err);
       error.value = '获取智能体失败';
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 获取单个智能体详情
   async function fetchAgentById(id: number) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -48,13 +49,13 @@ export const useAgentStore = defineStore('agent', () => {
       error.value = '获取智能体详情失败';
       return null;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 创建智能体
   async function createAgent(agentData: Omit<Agent, 'id' | 'createdAt'>) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -71,13 +72,13 @@ export const useAgentStore = defineStore('agent', () => {
       error.value = '创建智能体失败';
       throw err;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 更新智能体
   async function modifyAgent(agentData: Agent) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -99,13 +100,13 @@ export const useAgentStore = defineStore('agent', () => {
       error.value = '更新智能体失败';
       throw err;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 删除智能体
   async function removeAgent(id: number) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -122,13 +123,13 @@ export const useAgentStore = defineStore('agent', () => {
       error.value = '删除智能体失败';
       return false;
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   
   // 通过类别删除智能体
   async function removeAgentByCategory(categoryId: number) {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -140,12 +141,12 @@ export const useAgentStore = defineStore('agent', () => {
       console.error(`Failed to delete agents by category ${categoryId}:`, err);
       error.value = '删除智能体失败';
     } finally {
-      loading.value = false;
+      globalStore.setLoadingState(false);
     }
   }
   return {
     agents,
-    loading,
+    loading: globalStore.isLoading,
     error,
     fetchAllAgents,
     fetchAgentById,

@@ -256,7 +256,7 @@ impl DerefMut for ChatMessage {
 }
 
 impl ChatMessage {
-    pub fn new_user(mut message: store::ChatMessage) -> Result<Self, error::Error> {
+    pub fn new_user(message: store::ChatMessage) -> Result<Self, error::Error> {
         if message.role != store::Role::User {
             return Err(error::Error::InvalidData(format!(
                 "Message with id {} is not a user message",

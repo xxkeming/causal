@@ -35,16 +35,17 @@
             :agent-name="agent?.name"
             :agent-description="agent?.description"
             :agent-icon="agentIcon"
-            :loading="loading"
+            :loading="globalStore.isLoading"
             :suggested-prompts="customQuestions"
             @retry="retryMessage"
             @delete="deleteMessage"
             @send="sendMessage"
+            @feedback="handleFeedback"
           />
 
           <!-- 使用拆分出的输入组件 -->
           <chat-input 
-            :loading="loading"
+            :loading="globalStore.isLoading"
             v-model:stream="stream"
             v-model:search="search"
             @send="sendMessage"
@@ -64,7 +65,7 @@
     <!-- 智能体选择器组件 -->
     <agent-selector
       v-model:visible="agentSelectorVisible"
-      @select="handleAgentSwitch"
+      @select="createSessionWithAgent"
     />
 
     <!-- 智能体配置弹窗 -->
@@ -112,6 +113,7 @@ import { useChatSessionStore } from '../../stores/chatSessionStore';
 import { useProviderStore} from '../../stores/providerStore';
 import { chatEvent, MessageEvent  } from '../../services/api';
 import * as api from '../../services/api';
+import { useGlobalStore } from '../../stores/globalStore';
 
 // 导入组件
 import AgentFormModal from '../agents/components/AgentFormModal.vue';
@@ -143,6 +145,7 @@ const agentStore = useAgentStore();
 const iconStore = useIconStore();
 const chatSessionStore = useChatSessionStore();
 const providerStore = useProviderStore(); // 添加 providerStore
+const globalStore = useGlobalStore(); // 添加 globalStore
 
 // 本地状态管理会话和消息
 const currentSessionId = ref<number | null>(null);
@@ -151,7 +154,6 @@ const messages = ref<ChatMessage[]>([]);
 
 // 状态
 const agent = ref<Agent | null>(null);
-const loading = ref(false);
 const siderCollapsed = ref(false);
 const stream = ref(true); // 添加stream状态
 const search = ref(false); // 添加联网搜索状态
@@ -179,19 +181,16 @@ const customQuestions = computed(() =>
 // 加载当前会话的消息
 async function loadSessionMessages(sessionId: number) {
   try {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     // 使用API获取会话消息而不是本地存储
     messages.value = await api.getMessagesBySession(sessionId);
   } catch (error) {
     console.error('加载会话消息失败:', error);
     messages.value = [];
   } finally {
-    loading.value = false;
+    globalStore.setLoadingState(false);
   }
 }
-
-// 不再需要保存消息到本地存储的函数，因为API会处理持久化
-// 删除 saveSessionMessages 函数
 
 // 加载智能体信息
 async function loadAgentInfo() {
@@ -247,7 +246,7 @@ function scrollToBottom() {
 
 // 发送消息
 async function sendMessage(text: string, attachments?: Attachment[]) {
-  if ((!text && (!attachments || attachments.length === 0)) || loading.value) return;
+  if ((!text && (!attachments || attachments.length === 0)) || globalStore.isLoading) return;
 
   if (agent.value === null) {
     message.error('请先选择智能体');
@@ -255,8 +254,6 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
   }
 
   try {
-    loading.value = true;
-
     // 添加用户消息
     const userMessage = {
       id: Date.now(), // 临时ID，API会替换
@@ -290,19 +287,19 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
 
     const assistantIndex = messages.value.findIndex(msg => msg.id === savedAssistantMessage.id);
 
+    globalStore.setLoadingState(true);
     // 将文件信息传递给API
     await sendApiMessage(agent.value.id as number, currentSessionId.value as number, savedAssistantMessage.id, assistantIndex);
   } catch (error) {
     console.error('API 请求失败:', error);
+    message.error('发送消息失败: ' + error);
   } finally {
-    loading.value = false;
+    globalStore.setLoadingState(false);
   }
 }
 
 async function sendApiMessage(agentId: number, sessionId: number, messageId: number, assistantIndex: number) {
   try {
-    loading.value = true;
-
     // 模拟流式输出，将文件信息传递给API
     await chatEvent(agentId, sessionId, messageId, search.value, stream.value, async (event: MessageEvent) => {
       switch (event.event) {
@@ -358,13 +355,14 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
     
     // 更新本地状态
     messages.value[assistantIndex] = errorMessage;
-  } finally {
-    loading.value = false;
+    throw error;
   }
 }
 
 // 修复重试消息功能
 async function retryMessage(index: number) {
+  if (globalStore.isLoading) return;
+
   const currentMessage = messages.value[index];
   if (!currentMessage || !currentSessionId.value || !agent.value) return;
   
@@ -377,18 +375,28 @@ async function retryMessage(index: number) {
     return;
   }
 
-  messages.value[index].content = ''; // 清空当前消息内容
-  messages.value[index].tools = []; // 清空工具结果
-  messages.value[index].status = 'sending'; // 设置状态为发送中
-  messages.value[index].createdAt = Date.now(); // 更新创建时间
-  await api.updateMessage(messages.value[index]);
+  try {
+    messages.value[index].content = ''; // 清空当前消息内容
+    messages.value[index].tools = []; // 清空工具结果
+    messages.value[index].status = 'sending'; // 设置状态为发送中
+    messages.value[index].createdAt = Date.now(); // 更新创建时间
+    await api.updateMessage(messages.value[index]);
 
-  // 重新发送用户消息
-  await sendApiMessage(agent.value.id as number, currentSessionId.value as number, currentMessage.id, index);
+    // 重新发送用户消息
+    await sendApiMessage(agent.value.id as number, currentSessionId.value as number, currentMessage.id, index);
+  } catch (error) {
+    console.error('重试消息失败:', error);
+    message.error('重试消息失败:' + error);
+  } finally {
+    globalStore.setLoadingState(false);
+  }
+  
 }
 
-// 修改删除消息函数
+// 删除消息函数
 async function deleteMessage(index: number) {
+  if (globalStore.isLoading) return;
+
   const currentMessage = messages.value[index];
   if (!currentMessage) return;
   
@@ -428,6 +436,8 @@ async function deleteMessage(index: number) {
 
 // 清除当前会话消息
 async function clearSession() {
+  if (globalStore.isLoading) return;
+
   if (currentSessionId.value) {
     try {
       // 显示确认对话框
@@ -457,6 +467,8 @@ async function clearSession() {
 
 // 关闭当前会话
 function closeSession() {
+  if (globalStore.isLoading) return;
+
   currentSessionId.value = null;
   currentSession.value = null;
   messages.value = [];
@@ -467,6 +479,8 @@ function closeSession() {
 
 // 切换会话
 async function switchSession(sessionId: number) {
+  if (globalStore.isLoading) return;
+
   // 获取会话信息
   const session = chatSessionStore.getSessionById(sessionId);
   
@@ -492,7 +506,10 @@ async function switchSession(sessionId: number) {
 async function deleteSession(sessionId: number) {
   try {
     const isCurrentSession = currentSessionId.value === sessionId;
-    
+
+    // 如果当前会话正在加载，则不允许删除
+    if (globalStore.isLoading && isCurrentSession) return;
+
     // 调用 store 删除会话
     const success = await chatSessionStore.deleteSession(sessionId);
     
@@ -532,7 +549,7 @@ async function handleModelChange(newModel: any) {
         (agent.value.model?.id === Number(newModel.providerId) && 
          agent.value.model?.name === newModel.modelName)) return;
     
-    loading.value = true;
+    globalStore.setLoadingState(true);
 
     const newAgent = {
       ...agent.value,
@@ -548,7 +565,7 @@ async function handleModelChange(newModel: any) {
     console.error('切换模型时出错:', error);
     message.error('切换模型时出错');
   } finally {
-    loading.value = false;
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -607,7 +624,7 @@ async function handleProviderSubmit(provider: Partial<Provider>) {
 // 配置提交
 async function handleAgentConfigSubmit(updatedAgent: Agent) {
   try {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     
     await agentStore.modifyAgent(updatedAgent);
     
@@ -623,41 +640,14 @@ async function handleAgentConfigSubmit(updatedAgent: Agent) {
     console.error('更新智能体时出错:', error);
     message.error('更新智能体失败');
   } finally {
-    loading.value = false;
-  }
-}
-
-// 智能体切换 - 创建新会话
-async function handleAgentSwitch(selectedAgent: Agent) {
-  try {
-    loading.value = true;
-    
-    // 创建带时间戳的会话名称
-    const timestamp = new Date().toLocaleString('zh-CN', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric'
-    });
-    const sessionTitle = `与${selectedAgent.name}的对话 (${timestamp})`;
-    
-    // 创建新会话
-    const newSession = await chatSessionStore.createNewSession(selectedAgent.id, sessionTitle);
-    
-    // 切换到新会话
-    await switchSession(newSession.id);
-    
-    message.success('创建会话成功');
-  } catch (error) {
-    console.error('创建会话失败:', error);
-    message.error('创建会话失败');
-  } finally {
-    loading.value = false;
+    globalStore.setLoadingState(false);
   }
 }
 
 // 使用选定的智能体创建新会话
 async function createSessionWithAgent(selectedAgent: Agent) {
+  if (globalStore.isLoading) return;
+
   try {
     // 创建带时间戳的会话名称
     const timestamp = new Date().toLocaleString('zh-CN', {
@@ -687,6 +677,8 @@ function navigateToCreateAgent() {
 
 // 改为根据agentId创建会话
 async function createSessionDirectly(agentId: number) {
+  if (globalStore.isLoading) return;
+
   // 如果agnetId === 0, 显示智能体选择器
   if (agentId === 0) {
     agentSelectorVisible.value = true;
@@ -694,44 +686,54 @@ async function createSessionDirectly(agentId: number) {
   }
   
   // 如果agentId不为0, 创建会话
+  // 获取智能体信息用于创建会话标题
+  const selectedAgent = await agentStore.fetchAgentById(agentId);
+  if (!selectedAgent) {
+    message.error('找不到对应的智能体');
+    return;
+  }
+  
+  await createSessionWithAgent(selectedAgent);
+}
+
+// 处理消息反馈
+async function handleFeedback({ messageId, feedback }: { messageId: number; feedback: number }) {
+  if (globalStore.isLoading) return;
+
   try {
-    loading.value = true;
+    globalStore.setLoadingState(true);
     
-    // 获取智能体信息用于创建会话标题
-    const selectedAgent = await agentStore.fetchAgentById(agentId);
-    if (!selectedAgent) {
-      message.error('找不到对应的智能体');
+    // 查找消息
+    const messageIndex = messages.value.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) {
+      message.error('消息不存在');
       return;
     }
+
+    // 更新本地状态
+    const updatedMessage = {
+      ...messages.value[messageIndex],
+      feedback
+    };
+
+    // 调用 API 更新消息
+    await api.updateMessage(updatedMessage);
     
-    // 创建带时间戳的会话名称
-    const timestamp = new Date().toLocaleString('zh-CN', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric'
-    });
-    const sessionTitle = `与${selectedAgent.name}的对话 (${timestamp})`;
-    
-    // 创建新会话
-    const newSession = await chatSessionStore.createNewSession(agentId, sessionTitle);
-    
-    // 切换到新会话
-    await switchSession(newSession.id);
-    
-    message.success('创建会话成功');
+    // 更新本地消息列表
+    messages.value[messageIndex] = updatedMessage;
+
   } catch (error) {
-    console.error('创建会话失败:', error);
-    message.error('创建会话失败');
+    console.error('更新反馈失败:', error);
+    message.error('更新反馈失败');
   } finally {
-    loading.value = false;
+    globalStore.setLoadingState(false);
   }
 }
 
 // 初始化 - 修改为不依赖URL参数
 onMounted(async () => {
   // 初始化聊天会话存储
-  chatSessionStore.initialize();
+  chatSessionStore.fetchAllSessions();
   
   // 确保加载了所有智能体数据
   if (agentStore.agents.length === 0) {

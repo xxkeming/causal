@@ -31,6 +31,36 @@
             
             <!-- 消息操作按钮 -->
             <div class="message-actions" v-if="message.status === 'success' || message.status === 'error'">
+              
+              <!-- 反馈按钮：仅AI消息显示 -->
+              <template v-if="message.role === 'assistant'">
+                <n-button 
+                  text
+                  class="tool-button"
+                  :class="{ 'active': message.feedback === 1 }"
+                  @click="$emit('feedback', { messageId: message.id, feedback: 1 })"
+                >
+                  <template #icon>
+                    <n-icon>
+                      <component :is="message.feedback === 1 ? ThumbsUp : ThumbsUpOutline" />
+                    </n-icon>
+                  </template>
+                </n-button>
+                
+                <n-button 
+                  text
+                  class="tool-button"
+                  :class="{ 'active': message.feedback === 2 }"
+                  @click="$emit('feedback', { messageId: message.id, feedback: 2 })"
+                >
+                  <template #icon>
+                    <n-icon>
+                      <component :is="message.feedback === 2 ? ThumbsDown : ThumbsDownOutline" />
+                    </n-icon>
+                  </template>
+                </n-button>
+              </template>
+              
               <!-- 复制按钮：只在有内容时显示 -->
               <n-button v-if="message.content"
                         text
@@ -161,6 +191,8 @@ import {
 import { 
   ServerOutline, PersonOutline, AlertCircleOutline,
   RefreshOutline, TrashOutline, CopyOutline, TerminalOutline,
+  ThumbsUpOutline, ThumbsDownOutline, // 添加点赞图标
+  ThumbsUp, ThumbsDown // 添加实心图标用于选中状态
 } from '@vicons/ionicons5';
 import MarkdownRenderer from '../../../components/MarkdownRenderer.vue';
 import { ChatMessage } from '../../../services/typings';
@@ -207,7 +239,7 @@ const props = defineProps({
 });
 
 // 定义事件 - 添加删除事件
-defineEmits(['retry', 'send', 'delete']);
+defineEmits(['retry', 'send', 'delete', 'feedback']);
 
 // DOM引用
 const messagesContainer = ref<HTMLElement | null>(null);
@@ -440,6 +472,15 @@ function copyMessage(message: ChatMessage) {
 
 .tool-button.copied {
   color: #22c55e;
+}
+
+/* 添加反馈按钮激活状态样式 */
+.tool-button.active {
+  color: var(--primary-color);
+}
+
+.tool-button.active:hover {
+  transform: none;
 }
 
 /* 移除旧的操作按钮样式 */

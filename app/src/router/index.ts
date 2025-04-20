@@ -80,7 +80,7 @@ const router = createRouter({
 //   const globalStore = useGlobalStore();
   
 //   // 如果正在测试中，阻止导航并显示提示信息
-//   if (globalStore.isTesting) {
+//   if (globalStore.isLoading) {
 //     // 使用 naive-ui 的 discrete API 创建消息提示
 //     const { message } = createDiscreteApi(['message']);
 //     message.warning('测试正在进行中，请等待测试完成后再进行操作');

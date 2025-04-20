@@ -13,19 +13,19 @@
             </div>
             <div class="editor-actions">
               <n-space>
-                <n-button quaternary size="small" @click="goBack" :loading="testLoading">
+                <n-button quaternary size="small" @click="goBack" :loading="toolStore.loading">
                   <template #icon>
                     <n-icon><CloseOutline /></n-icon>
                   </template>
                   返回
                 </n-button>
-                <n-button quaternary size="small" :loading="saving || testLoading" @click="saveTool">
+                <n-button quaternary size="small" :loading="saving || toolStore.loading" @click="saveTool">
                   <template #icon>
                     <n-icon><SaveOutline /></n-icon>
                   </template>
                   {{ isEdit ? '更新' : '保存' }}
                 </n-button>
-                <n-button quaternary size="small" @click="testCode" :loading="testLoading">
+                <n-button quaternary size="small" @click="testCode" :loading="toolStore.loading">
                   <template #icon>
                     <n-icon><PlayOutline /></n-icon>
                   </template>
@@ -272,7 +272,6 @@ import { useToolStore } from '../../stores/toolStore';
 import AvatarSelector from '../../components/AvatarSelector.vue';
 import CodeEditor from '../../components/CodeEditor.vue';
 import LogViewer from '../../components/LogViewer.vue';
-import { useGlobalStore } from '../../stores/globalStore';
 
 // 添加props接收父组件传递的数据
 const props = defineProps({
@@ -294,7 +293,6 @@ const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const toolStore = useToolStore();
-const globalStore = useGlobalStore();
 
 // 编辑器引用
 const jsEditor = ref(null);
@@ -313,7 +311,6 @@ const activeTab = ref('code');
 const saving = ref(false);
 
 // 测试相关状态变量
-const testLoading = ref(false);
 const testLogs = ref([]);
 
 // 创建默认的JS工具数据
@@ -487,9 +484,8 @@ async function testCode() {
   }
 
   try {
-    testLoading.value = true;
     // 设置全局测试状态，使菜单禁用
-    globalStore.setTestingState(true);
+    toolStore.setTestState(true);
 
     // 添加测试开始日志
     addTestLog('info', '测试开始', '准备执行工具函数...');
@@ -537,10 +533,8 @@ async function testCode() {
     // 自动切换到测试标签页
     activeTab.value = 'test';
   } finally {
-    // 确保测试状态被重置，按钮可用
-    testLoading.value = false;
     // 重置全局测试状态
-    globalStore.setTestingState(false);
+    toolStore.setTestState(false);
   }
 }
 
@@ -709,13 +703,6 @@ watch(() => props.tool, (newTool) => {
 onMounted(async () => {
   // 加载工具数据
   await loadToolData();
-});
-
-// 组件卸载前确保重置全局状态
-onBeforeUnmount(() => {
-  if (globalStore.isTesting) {
-    globalStore.setTestingState(false);
-  }
 });
 
 // 添加参数名称验证规则

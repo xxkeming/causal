@@ -3,15 +3,15 @@ import { ref } from 'vue';
 
 export const useGlobalStore = defineStore('global', () => {
   // 全局加载状态
-  const isTesting = ref(false);
+  const loading = ref(false);
 
-  // 设置测试状态
-  function setTestingState(testing: boolean) {
-    isTesting.value = testing;
+  // 设置加载状态
+  function setLoadingState(testing: boolean) {
+    loading.value = testing;
   }
 
   return {
-    isTesting,
-    setTestingState
+    isLoading: loading,
+    setLoadingState
   };
 });
