@@ -307,7 +307,7 @@ async function handleSubmit() {
       apiKey: formData.value.apiKey,
       models: formData.value.models
     };
-    
+
     emit('submit', providerData);
   } catch (error) {
     console.error('Form validation failed:', error);

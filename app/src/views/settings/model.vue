@@ -58,7 +58,7 @@
               :provider="currentProvider"
               :is-edit="!isCreating"
               :embedded="true"
-              @onSubmit="handleProviderSubmit"
+              @submit="handleProviderSubmit"
               @delete="handleProviderDelete"
               @cancel="cancelCreate"
             />
@@ -94,17 +94,18 @@ const loadingDetails = ref(false);
 const providerStore = useProviderStore();
 
 // 处理提供商提交
-async function handleProviderSubmit(provider: Omit<Provider, "id">) {
+async function handleProviderSubmit(provider: Partial<Provider>) {
+  console.log('提交的提供商:', provider);
   try {
     if (isCreating.value) {
-      await providerStore.createProvider(provider);
+      await providerStore.createProvider(provider as Provider);
       message.success('创建提供商成功');
       isCreating.value = false;
     } else if (currentProvider.value) {
-      await providerStore.modifyProvider({ ...provider, id: currentProvider.value.id });
+      await providerStore.modifyProvider({ ...provider, id: currentProvider.value.id } as Provider);
       message.success('更新提供商成功');
       // 更新当前提供商
-      currentProvider.value = { ...provider, id: currentProvider.value.id };
+      currentProvider.value = { ...provider, id: currentProvider.value.id } as Provider;
     }
   } catch (error) {
     message.error('保存提供商失败');

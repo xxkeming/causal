@@ -1,6 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
-use crate::error;
 use async_openai::{
     config::OpenAIConfig,
     types::{
@@ -13,10 +16,13 @@ use async_openai::{
     },
     Client,
 };
+
 use futures::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::{sync::Mutex, task::JoinSet};
+
+use crate::error;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
@@ -42,7 +48,7 @@ pub enum MessageEvent {
     },
 }
 
-async fn call_fn(name: &str, args: &str) -> Result<Value, Box<dyn std::error::Error>> {
+async fn call_tools(name: &str, args: &str) -> Result<Value, Box<dyn std::error::Error>> {
     println!("Calling function: {} with args: {}", name, args);
 
     let function_args: serde_json::Value = args.parse().unwrap();
@@ -56,7 +62,7 @@ async fn call_fn(name: &str, args: &str) -> Result<Value, Box<dyn std::error::Er
     // }))
 
     let query = function_args["query"].as_str().unwrap_or_default();
-    let search = tools::tavily_search(query).await.unwrap();
+    let search = tools::tavily_search(query).await?;
     Ok(serde_json::to_value(search)?)
 }
 
@@ -122,7 +128,7 @@ async fn event_chat_stream(
                         let tool_call_responses = tool_call_responses.clone();
                         sets.spawn(async move {
                             let response_content =
-                                call_fn(&tool_call.function.name, &tool_call.function.arguments)
+                                call_tools(&tool_call.function.name, &tool_call.function.arguments)
                                     .await
                                     .unwrap();
                             tool_call_responses.lock().await.push((tool_call, response_content));
@@ -196,7 +202,7 @@ async fn event_chat(
                 let tool_call_clone = tool_call.clone();
 
                 sets.spawn(async move {
-                    (tool_call_clone, call_fn(&name, &args).await.unwrap_or_default())
+                    (tool_call_clone, call_tools(&name, &args).await.unwrap_or_default())
                 });
             }
 
@@ -233,6 +239,72 @@ async fn event_chat(
     Ok((false, response.usage))
 }
 
+struct ChatMessage(store::ChatMessage);
+
+impl Deref for ChatMessage {
+    type Target = store::ChatMessage;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ChatMessage {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl ChatMessage {
+    pub fn new_user(mut message: store::ChatMessage) -> Result<Self, error::Error> {
+        if message.role != store::Role::User {
+            return Err(error::Error::InvalidData(format!(
+                "Message with id {} is not a user message",
+                message.id
+            )));
+        }
+        Ok(Self::new(message, true))
+    }
+
+    pub fn new(mut message: store::ChatMessage, context_extend: bool) -> Self {
+        if context_extend {
+            if let Some(attachments) = message.attachments.as_ref() {
+                let attachments = attachments
+                    .into_iter()
+                    .map(|attachment| {
+                        format!(
+                            "<attachment><name>{}</name><data>{}</data></attachment>",
+                            attachment.name, attachment.data
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                message.content = format!("{}\n\n{}", attachments, message.content);
+            }
+        }
+
+        Self(message)
+    }
+}
+
+impl TryFrom<ChatMessage> for ChatCompletionRequestMessage {
+    type Error = error::Error;
+
+    fn try_from(message: ChatMessage) -> Result<Self, Self::Error> {
+        if message.0.role == store::Role::User {
+            Ok(ChatCompletionRequestUserMessageArgs::default()
+                .content(message.0.content)
+                .build()?
+                .into())
+        } else {
+            Ok(ChatCompletionRequestAssistantMessageArgs::default()
+                .content(message.0.content)
+                .build()?
+                .into())
+        }
+    }
+}
+
 pub async fn event(
     store: tauri::State<'_, store::Store>, agent_id: u64, session_id: u64, message_id: u64,
     search: bool, stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
@@ -257,37 +329,23 @@ pub async fn event(
         message_id - 1,
         agent.context_size as usize * 2 + 1,
     )?;
-    for message in contexts.iter() {
-        println!("Message: {:?}", message.content);
+    for context in contexts.iter() {
+        println!("Message: {:?}", context.content);
     }
 
-    let Some(message) = contexts.pop() else {
+    let Some(context) = contexts.pop() else {
         return Err(error::Error::InvalidData(format!(
             "Message with id {} not found",
             message_id - 1
         )));
     };
-
-    // 添加附件 client.context(doc)
-    let content = if let Some(attachments) = message.attachments {
-        let attachments = attachments
-            .into_iter()
-            .map(|attachment| {
-                format!(
-                    "<attachment><name>{}</name><data>{}</data></attachment>",
-                    attachment.name, attachment.data
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        format!("{}\n\n{}", attachments, message.content)
-    } else {
-        message.content.clone()
-    };
+    let mut context = ChatMessage::new_user(context)?;
 
     // 联网搜索结果
-    let content = if search {
-        let search = tools::tavily_search(message.content.as_ref()).await.unwrap();
+    if search {
+        let search = tools::tavily_search(context.content.as_ref())
+            .await
+            .map_err(|e| error::Error::InvalidData(format!("{:?}", e)))?;
         let search = search
             .into_iter()
             .map(|item| {
@@ -296,10 +354,8 @@ pub async fn event(
             .collect::<Vec<_>>()
             .join("\n");
         println!("Search: {:?}", search);
-        format!("{}\n\n{}", content, message.content)
-    } else {
-        content
-    };
+        context.content = format!("{}\n\n{}", context.content, search);
+    }
 
     let config = async_openai::config::OpenAIConfig::new()
         .with_api_base(provider.url.clone())
@@ -352,21 +408,10 @@ pub async fn event(
         .build()?
         .into()];
 
-    for context in contexts.iter() {
-        let message = if context.role == store::Role::User {
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(context.content.clone())
-                .build()?
-                .into()
-        } else {
-            ChatCompletionRequestAssistantMessageArgs::default()
-                .content(context.content.clone())
-                .build()?
-                .into()
-        };
-        messages.push(message);
+    for context in contexts.into_iter() {
+        messages.push(ChatMessage::new(context, agent.context_extend).try_into()?);
     }
-    messages.push(ChatCompletionRequestUserMessageArgs::default().content(content).build()?.into());
+    messages.push(context.try_into()?);
 
     on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
 
