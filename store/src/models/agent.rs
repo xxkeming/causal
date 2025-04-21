@@ -67,6 +67,9 @@ pub struct Agent {
     pub temperature: f64,
 
     /// 词汇多样性(0-1)
+    #[serde(default, rename = "topP")]
+    pub top_p: f64,
+
     /// 最大消息长度，0表示不限制
     #[serde(rename = "maxTokens")]
     pub max_tokens: u32,

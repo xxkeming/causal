@@ -69,6 +69,9 @@ export interface Agent {
   // 默认1, 0 - 2
   temperature: number;
 
+  // 最高概率采样，值越大，回复内容越赋有多样性、创造性、随机性；设为 0 根据事实回答。日常聊天建议设置为 0.9
+  topP: number;
+
   // 最大消息长度, 默认0, 0 不限制
   maxTokens: number;
 

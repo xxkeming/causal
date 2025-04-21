@@ -193,9 +193,37 @@
                 </div>
               </div>
             </n-form-item>
-        
-            <!-- 删除 topP 和 topK 表单项 -->
-        
+
+            <n-form-item>
+              <template #label>
+                <div class="label-with-help">
+                  <n-popover trigger="hover" placement="top">
+                    <template #trigger>
+                      <n-icon size="16" class="help-icon">
+                        <HelpCircleOutline />
+                      </n-icon>
+                    </template>
+                    <span class="popover-content">最高概率采样，值越大，回复内容越赋有多样性、创造性、随机性；设为0根据事实回答。日常聊天建议设置为0.9</span>
+                  </n-popover>
+                  <span style="margin-left: 8px;">Top P</span>
+                </div>
+              </template>
+              <div class="slider-block">
+                <n-slider
+                  v-model:value="formModel.topP"
+                  :min="0"
+                  :max="1"
+                  :step="0.1"
+                  :tooltip="true"
+                  :marks="topPMarks"
+                  :style="{ width: '400px' }"
+                />
+                <div class="value-display">
+                  {{ formModel.topP.toFixed(1) }}
+                </div>
+              </div>
+            </n-form-item>
+
             <n-form-item>
               <template #label>
                 <div class="label-with-help">
@@ -539,6 +567,7 @@ const formModel = reactive<{
   model?: ProviderModel;
   prompt: string;
   temperature: number;
+  topP: number; // 添加 topP 属性
   maxTokens: number;
   contextSize: number;
   contextExtend: boolean;
@@ -552,6 +581,7 @@ const formModel = reactive<{
   iconId: 0, // 将 avatarId 改为 iconId
   prompt: '',
   temperature: 0.7,
+  topP: 0.9, // 初始化 topP 属性
   maxTokens: 0,
   contextSize: 5,
   contextExtend: false,
@@ -591,6 +621,13 @@ const temperatureMarks = {
   0: '事实性',
   1: '平衡',
   2: '创造性'
+};
+
+// topP 标记
+const topPMarks = {
+  0: '0',
+  0.5: '0.5',
+  1: '1'
 };
 
 // 分类选项
@@ -769,6 +806,7 @@ watch(() => props.visible, (visible) => {
     formModel.model = undefined;
     formModel.prompt = '';
     formModel.temperature = 0.7;
+    formModel.topP = 0.9;
     formModel.maxTokens = 0;
     formModel.contextSize = 5;
     formModel.contextExtend = false;
@@ -794,6 +832,7 @@ watch(() => props.visible, (visible) => {
     formModel.model = props.agentData.model;
     formModel.prompt = props.agentData.prompt || '';
     formModel.temperature = props.agentData.temperature;
+    formModel.topP = props.agentData.topP;
     formModel.maxTokens = props.agentData.maxTokens;
     formModel.contextSize = props.agentData.contextSize;
     formModel.contextExtend = props.agentData.contextExtend || false;

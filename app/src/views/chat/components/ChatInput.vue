@@ -225,8 +225,8 @@ async function handleFiles(files: File[]) {
         attachment.data = data;
         attachment.size = data.length;
       } catch (error) {
-        console.error('这种类型的附件暂不支持:', error);
-        message.error(`这种类型的附件暂不支持: ${attachment.name}`);
+        console.error('附件解析失败:', error);
+        message.error(`附件解析失败: ${attachment.name}`);
         return;
       }
     }

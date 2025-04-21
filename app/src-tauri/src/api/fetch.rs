@@ -1,5 +1,3 @@
-use base64::prelude::*;
-
 use crate::error;
 
 pub fn ftech(
@@ -244,34 +242,22 @@ pub fn ftech(
             }
 
             let convert = serde_json::from_str::<Convert>(data)?;
-            let input = format!("/tmp/{}", convert.name);
-
-            if !document::is_loader(&input) {
-                println!("not support file type: {}", input);
-                return Ok(serde_json::json!({
-                    "status": "error",
-                    "message": "not support file type",
-                }));
-            }
-
-            // data 解码base64
-            let data = BASE64_STANDARD.decode(&convert.data)?;
-            std::fs::write(&input, data)?;
-
-            match document::loader_from_file(&input) {
-                Some(data) => {
+            if let Some((title, data)) =
+                document::loader_from_data_base64(convert.name, convert.data)
+            {
+                println!("convert title: {:?} data: {}", title, data.len());
+                if data.len() > 0 {
                     return Ok(serde_json::json!({
                         "status": "success",
                         "data": data,
                     }));
                 }
-                None => {
-                    return Ok(serde_json::json!({
-                        "status": "error",
-                        "message": "convert failed",
-                    }));
-                }
             }
+
+            return Ok(serde_json::json!({
+                "status": "error",
+                "message": "convert failed",
+            }));
         }
         _ => Err(error::Error::Unknown),
     }

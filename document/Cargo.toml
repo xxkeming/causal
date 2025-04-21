@@ -5,5 +5,7 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-pandoc = "0.8.11"
 mime_guess2 = "2.3.0"
+
+base64 = "0.22.1"
+markitdown = "0.1.9"

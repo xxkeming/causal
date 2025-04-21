@@ -38,7 +38,10 @@
                   text
                   class="tool-button"
                   :class="{ 'active': message.feedback === 1 }"
-                  @click="$emit('feedback', { messageId: message.id, feedback: 1 })"
+                  @click="$emit('feedback', { 
+                    messageId: message.id, 
+                    feedback: message.feedback === 1 ? 0 : 1 
+                  })"
                 >
                   <template #icon>
                     <n-icon>
@@ -51,7 +54,10 @@
                   text
                   class="tool-button"
                   :class="{ 'active': message.feedback === 2 }"
-                  @click="$emit('feedback', { messageId: message.id, feedback: 2 })"
+                  @click="$emit('feedback', { 
+                    messageId: message.id, 
+                    feedback: message.feedback === 2 ? 0 : 2 
+                  })"
                 >
                   <template #icon>
                     <n-icon>

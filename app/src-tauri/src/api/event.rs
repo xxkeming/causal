@@ -385,23 +385,23 @@ pub async fn event(
     //     )
     //     .build()?];
 
-    let tools = vec![ChatCompletionToolArgs::default()
-        .r#type(ChatCompletionToolType::Function)
-        .function(
-            FunctionObjectArgs::default()
-                .name("fn_100000")
-                .description("Useful for when you need to answer questions by searching the web.")
-                .parameters(json!({
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string"
-                        }
-                    }
-                }))
-                .build()?,
-        )
-        .build()?];
+    // let tools = vec![ChatCompletionToolArgs::default()
+    //     .r#type(ChatCompletionToolType::Function)
+    //     .function(
+    //         FunctionObjectArgs::default()
+    //             .name("fn_100000")
+    //             .description("Useful for when you need to answer questions by searching the web.")
+    //             .parameters(json!({
+    //                 "type": "object",
+    //                 "properties": {
+    //                     "query": {
+    //                         "type": "string"
+    //                     }
+    //                 }
+    //             }))
+    //             .build()?,
+    //     )
+    //     .build()?];
 
     let mut messages = vec![ChatCompletionRequestSystemMessageArgs::default()
         .content(agent.prompt.clone())
@@ -421,8 +421,9 @@ pub async fn event(
         let mut request = CreateChatCompletionRequestArgs::default()
             .model(model.name.clone())
             .temperature(agent.temperature as f32)
+            .top_p(agent.top_p as f32)
             .messages(messages.clone())
-            .tools(tools.clone())
+            // .tools(tools.clone())
             .build()?;
 
         if agent.max_tokens > 0 {
