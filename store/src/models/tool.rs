@@ -18,9 +18,17 @@ pub struct Param {
     pub test_value: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct McpTool {
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "inputSchema")]
+    pub input_schema: Option<serde_json::Value>,
+}
+
 /// JavaScript工具数据
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ToolScript {
+pub struct ToolJavaScript {
     /// 参数
     pub param: Option<Vec<Param>>,
     /// JS代码
@@ -32,6 +40,9 @@ pub struct ToolScript {
 pub struct ToolMcpIo {
     /// 路径
     pub path: String,
+
+    /// tools
+    pub tools: Vec<McpTool>,
 }
 
 /// MCP-SSE工具数据
@@ -39,14 +50,20 @@ pub struct ToolMcpIo {
 pub struct ToolMcpSse {
     /// URL
     pub url: String,
+
+    /// tools
+    pub tools: Vec<McpTool>,
 }
 
 /// 工具数据（可能是JS脚本、MCP-IO或MCP-SSE）
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
+#[serde(tag = "type")]
 pub enum ToolData {
-    Script(ToolScript),
+    #[serde(rename = "javsSript")]
+    JavsScript(ToolJavaScript),
+    #[serde(rename = "mcpIo")]
     McpIo(ToolMcpIo),
+    #[serde(rename = "mcpSse")]
     McpSse(ToolMcpSse),
 }
 
@@ -81,9 +98,6 @@ pub struct Tool {
     pub name: String,
     /// 描述
     pub description: String,
-    /// 工具类型: js, mcp-io, mcp-sse
-    #[serde(rename = "type")]
-    pub tool_type: String,
     /// 工具数据
     pub data: ToolData,
     /// 创建时间
@@ -99,7 +113,7 @@ impl Tool {
     // 获取参数（如果是JS工具）
     pub fn params(&self) -> Option<&Vec<Param>> {
         match &self.data {
-            ToolData::Script(script) => script.param.as_ref(),
+            ToolData::JavsScript(script) => script.param.as_ref(),
             _ => None,
         }
     }
@@ -107,7 +121,7 @@ impl Tool {
     // 获取代码（如果是JS工具）
     pub fn code(&self) -> Option<&str> {
         match &self.data {
-            ToolData::Script(script) => Some(&script.code),
+            ToolData::JavsScript(script) => Some(&script.code),
             _ => None,
         }
     }

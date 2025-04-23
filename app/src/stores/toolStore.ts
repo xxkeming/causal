@@ -12,8 +12,9 @@ export const useToolStore = defineStore('tool', () => {
   async function fetchAllTools() {
     globalStore.setLoadingState(true);
     try {
-      if (tools.value.length === 0) {
+      if (tools.value.length == 0) {
         tools.value = await api.getAllTools();
+        console.log('fetchAllTools', tools.value[0]);
       }
     } catch (error) {
       console.error('Failed to fetch tools:', error);
@@ -26,11 +27,15 @@ export const useToolStore = defineStore('tool', () => {
   async function fetchToolById(id: number): Promise<Tool | null> {
     globalStore.setLoadingState(true);
     try {
+      const toolIndex = tools.value.findIndex(t => t.id === id);
+      if (toolIndex !== -1) {
+        return tools.value[toolIndex];
+      }
       const tool = await api.getToolById(id);
       return tool;
     } catch (error) {
       console.error(`Failed to fetch tool ${id}:`, error);
-      return null;
+      throw error;
     } finally {
       globalStore.setLoadingState(false);
     }
@@ -66,7 +71,6 @@ export const useToolStore = defineStore('tool', () => {
       await api.updateTool(toolData);
 
       tools.value[index] = toolData;
-
     } catch (error) {
       console.error(`Failed to update tool ${tool.id}:`, error);
       throw error;

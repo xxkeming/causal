@@ -1,8 +1,14 @@
 <template>
   <div class="tool-edit-router">
     <js-edit 
-      v-if="isJsTool || !isEdit" 
-      :tool="tool" 
+      v-if="isJsType || (!isEdit && (tool?.data.type === 'javaScript' || toolType === 'js'))" 
+      :tool="tool || undefined" 
+      :category-id="categoryIdFromQuery" 
+      :categories="categories"
+    />
+    <sse-edit
+      v-else-if="isSseType || (!isEdit && (tool?.data.type === 'mcpSse' || toolType === 'mcp-sse'))"
+      :tool="tool || undefined"
       :category-id="categoryIdFromQuery" 
       :categories="categories"
     />
@@ -10,7 +16,7 @@
       <n-result
         status="warning"
         title="暂不支持该类型工具的编辑"
-        :description="`当前不支持编辑类型为 ${tool?.type || '未知'} 的工具`"
+        :description="`当前不支持编辑类型为 ${ toolType || '未知'} 的工具`"
       >
         <template #footer>
           <n-button @click="goBack">
@@ -22,18 +28,21 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NResult, NButton, useMessage } from 'naive-ui';
 import { useToolStore } from '../../stores/toolStore';
 import { useToolCategoryStore } from '../../stores/toolCategoryStore';
+import { Tool, ToolCategory } from '../../services/typings';
 import JsEdit from './js-edit.vue';
+import SseEdit from './sse-edit.vue';
 
 const route = useRoute();
 const router = useRouter();
-const toolStore = useToolStore();
+
 const categoryStore = useToolCategoryStore();
+const toolStore = useToolStore();
 const message = useMessage();
 
 // 判断是否为编辑模式
@@ -41,11 +50,26 @@ const isEdit = computed(() => !!route.params.id);
 const toolId = computed(() => Number(route.params.id));
 
 // 当前工具
-const tool = ref(null);
-const isJsTool = computed(() => !tool.value || tool.value.type === 'js');
+const tool = ref<Tool | undefined>(undefined);
+const isJsType = computed(() => {
+  if (!tool.value) {
+    return toolType.value === 'js';
+  }
+  return tool.value.data.type === 'javaScript';
+});
+
+const isSseType = computed(() => {
+  if (!tool.value) {
+    return toolType.value === 'mcp-sse';
+  }
+  return tool.value.data.type === 'mcpSse';
+});
+
+// 工具类型判断
+const toolType = computed(() => route.query.type as string);
 
 // 分类数据
-const categories = ref([]);
+const categories = ref<ToolCategory[]>([]);
 
 // 从查询参数获取分类ID，用于创建新工具时设置默认分类
 const categoryIdFromQuery = computed(() => {
@@ -77,9 +101,8 @@ async function loadToolData() {
       if (fetchedTool) {
         tool.value = fetchedTool;
         
-        // 如果不是JS工具，显示警告
-        if (!isJsTool.value) {
-          message.warning(`当前不支持编辑类型为 ${tool.value.type} 的工具`);
+        if (!isJsType.value && !isSseType.value) {
+          message.warning(`当前不支持编辑类型为 ${tool.value.data.type} 的工具`);
         }
       } else {
         message.error('未找到工具数据');
@@ -98,6 +121,9 @@ onMounted(async () => {
   await loadCategories();
   // 再加载工具数据
   await loadToolData();
+
+  console.log('tool type:', toolType.value);
+  console.log('tool:', tool.value);
 });
 </script>
 

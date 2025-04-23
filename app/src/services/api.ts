@@ -1,4 +1,4 @@
-import { Agent, AgentCategory, Tool, ToolCategory } from './typings';
+import { Agent, AgentCategory, Tool, ToolCategory, McpTool } from './typings';
 import { mockKnowledgeBases } from './mock/knowledgeData';
 import { KnowledgeBase, KnowledgeBaseCategory } from './typings';
 import { ChatSession, ChatMessage } from './typings';
@@ -161,6 +161,11 @@ export async function deleteTool(id: number): Promise<boolean> {
 // 根据类别删除工具
 export async function deleteToolByCategory(categoryId: number): Promise<boolean> {
   return tauriApi.fetch_local('tool.delete.by.category', categoryId) as Promise<boolean>;
+}
+
+// 获取mcp-sse所有工具 
+export async function getMcpSseTools(url: string): Promise<McpTool[]> {
+  return tauriApi.fetch_local('tool.mcp.sse.tools', url) as Promise<McpTool[]>;
 }
 
 // 测试工具
@@ -358,7 +363,6 @@ export async function deleteMessagesBySession(sessionId: number): Promise<boolea
 
 // 模拟流式输出的聊天接口（逐字输出，间隔10毫秒）
 export async function chatEvent(agentId: number, sessionId: number, messageId: number, search: boolean, stream: boolean, onData: (chunk: tauriApi.MessageEvent) => void) {
-
   return tauriApi.event_local(agentId, sessionId, messageId, search, stream, onData);
 }
 

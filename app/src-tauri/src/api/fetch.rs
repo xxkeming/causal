@@ -1,6 +1,6 @@
 use crate::error;
 
-pub fn ftech(
+pub async fn ftech(
     store: tauri::State<'_, store::Store>, name: &str, data: &str,
 ) -> Result<serde_json::Value, error::Error> {
     // println!("fetch, {} {}", name, data);
@@ -175,6 +175,15 @@ pub fn ftech(
             store.delete_tool_category(id)?;
             Ok(serde_json::json!({ "status": "success" }))
         }
+        "tool.mcp.sse.tools" => {
+            let url: String = serde_json::from_str(data)?;
+            match tools::McpSseTool::new(url).description().await {
+                Ok(description) => {
+                    Ok(serde_json::json!({ "status": "success", "data": description }))
+                }
+                Err(e) => Ok(serde_json::json!({ "status": "error", "error": e.to_string() })),
+            }
+        }
         "chat.session.add" => {
             let session: store::ChatSession = serde_json::from_str(data)?;
             let session = store.add_chat_session(session)?;
@@ -242,6 +251,8 @@ pub fn ftech(
             }
 
             let convert = serde_json::from_str::<Convert>(data)?;
+            // println!("convert name: {} data: {}", convert.name, convert.data.len());
+
             if let Some((title, data)) =
                 document::loader_from_data_base64(convert.name, convert.data)
             {

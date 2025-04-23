@@ -93,12 +93,19 @@
               </template>
             </n-input>
           </div>
-          <n-button type="primary" class="create-button" @click="showToolFormModal">
-            <template #icon>
-              <n-icon><AddOutline /></n-icon>
-            </template>
-            创建工具
-          </n-button>
+          <n-dropdown 
+            trigger="hover"
+            :options="createOptions" 
+            @select="showToolFormModal"
+            placement="bottom-start"
+          >
+            <n-button type="primary" class="create-button">
+              <template #icon>
+                <n-icon><AddOutline /></n-icon>
+              </template>
+              创建工具
+            </n-button>
+          </n-dropdown>
         </div>
     
         <n-spin :show="toolStore.loading || categoryStore.loading">
@@ -108,8 +115,8 @@
                 <n-card hoverable class="tool-card" :bordered="false">
                   <!-- 添加工具类型标签 -->
                   <div class="tool-type-tag">
-                    <n-tag size="small" :type="getTypeTagColor(tool.type)">
-                      {{ getTypeDisplay(tool.type) }}
+                    <n-tag size="small" :type="getTypeTagColor(tool.data.type)">
+                      {{ getTypeDisplay(tool.data.type) }}
                     </n-tag>
                   </div>
                   
@@ -177,16 +184,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, h, type Component } from 'vue';
 import { useRouter } from 'vue-router'
 import { 
   NLayout, NLayoutSider, NList, NListItem, NCard, NAvatar, 
   NButton, NIcon, NGrid, NGridItem, NInput, NScrollbar,
-  NEmpty, NSpace, NSpin, NTag, NTooltip, useDialog
+  NEmpty, NSpace, NSpin, NTag, NTooltip, NDropdown,
+  useDialog, type DropdownOption 
 } from 'naive-ui';
 import { 
   AddOutline, SearchOutline, BuildOutline, CreateOutline, 
-  TrashBinOutline, CloseOutline
+  TrashBinOutline, CloseOutline, ServerOutline, ExtensionPuzzleOutline
 } from '@vicons/ionicons5';
 import { useMessage } from 'naive-ui';
 import { ToolCategory, Tool } from '../../services/typings';
@@ -217,8 +225,9 @@ const categoryToEditForModal = computed(() => categoryToEdit.value || undefined)
 
 // 计算属性 - 同时处理分类筛选和关键词搜索
 const filteredTools = computed(() => {
+  // 拷贝toolStore.tools
   let result = toolStore.tools;
-  
+
   // 先按分类筛选
   if (selectedCategory.value !== 0) {
     result = result.filter(tool => tool.categoryId === selectedCategory.value);
@@ -232,7 +241,8 @@ const filteredTools = computed(() => {
       (tool.description && tool.description.toLowerCase().includes(keyword))
     );
   }
-  
+
+  console.log('Filtered tools:', result);
   return result;
 });
 
@@ -319,9 +329,41 @@ async function addNewCategory(name: string) {
   }
 }
 
-// 显示工具表单模态框
-function showToolFormModal() {
-  const query = selectedCategory.value !== 0 ? { categoryId: selectedCategory.value } : {};
+// 添加工具类型菜单选项
+const createOptions: DropdownOption[] = [
+  {
+    label: 'JavaScript',
+    key: 'js',
+    icon: renderIcon(BuildOutline),
+    disabled: true,
+  },
+  {
+    label: 'MCP-SSE',
+    key: 'mcp-sse',
+    icon: renderIcon(ServerOutline),
+    disabled: false
+  },
+  {
+    label: 'MCP-IO',
+    key: 'mcp-io',
+    icon: renderIcon(ExtensionPuzzleOutline),
+    disabled: true
+  }
+];
+
+// 添加图标渲染函数
+function renderIcon(icon: Component) {
+  return () => h(NIcon, null, { default: () => h(icon) });
+}
+
+// 修改显示工具表单模态框函数
+function showToolFormModal(key: string) {
+  const query = selectedCategory.value !== 0 ? 
+    { categoryId: selectedCategory.value, type: key } : 
+    { type: key };
+
+  console.log('showToolFormModal', query);
+
   router.push({ path: '/tools/edit', query });
 }
 
@@ -354,6 +396,7 @@ async function confirmDeleteTool(tool: Tool) {
 
 // 编辑工具
 function handleEditTool(tool: Tool) {
+  console.log('Editing tool:', toolStore.tools);
   router.push(`/tools/edit/${tool.id}`);
 }
 
@@ -382,11 +425,11 @@ function getTypeDisplay(type: string): string {
 // 获取工具类型标签颜色
 function getTypeTagColor(type: string): "error" | "info" | "success" | "warning" | "default" | "primary" {
   switch(type) {
-    case 'js':
+    case 'javaScript':
       return 'success';
-    case 'mcp-io':
+    case 'mcpIo':
       return 'info';
-    case 'mcp-sse':
+    case 'mcpSse':
       return 'warning';
     default:
       return 'default';

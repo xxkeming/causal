@@ -15,6 +15,9 @@ pub enum Error {
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("tools error: {0}")]
+    Tools(#[from] tools::Error),
+
     #[error("Unknown data")]
     Unknown,
 }

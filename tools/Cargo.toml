@@ -5,11 +5,13 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-deno_core = "0.343.0"
-deno_error = "0.5.6"
-reqwest = "0.12.12"
+# deno_core = "0.343.0"
+# deno_error = "0.5.6"
+# reqwest = "0.12.12"
 
 tavily = "2.0.3"
+
+mcp-core = { version = "0.1.43", features = ["sse"] }
 
 thiserror = { workspace = true }
 

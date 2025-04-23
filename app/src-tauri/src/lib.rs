@@ -1,11 +1,12 @@
 mod api;
 mod error;
+mod openai;
 
 #[tauri::command]
 async fn fetch(
     store: tauri::State<'_, store::Store>, name: String, data: String,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::fetch::ftech(store, &name, &data).map_err(|e| e.into())
+    api::fetch::ftech(store, &name, &data).await.map_err(|e| e.into())
 }
 
 #[tauri::command]

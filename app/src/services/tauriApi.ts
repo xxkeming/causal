@@ -15,10 +15,10 @@ interface Response {
  */
 export async function fetch_local(name: string, data: Object | null): Promise<Object> {
   try {
-    console.log('fetch_local:', name, data);
+    // console.log('fetch_local:', name, JSON.stringify(data));
 
     // data 转json字符串
-    let result = await invoke('fetch', { name, data: data === null ? "" : JSON.stringify(data)}) as Response;
+    let result = await invoke('fetch', { name, data: data === null ? "" : JSON.stringify(data) }) as Response;
     console.log('fetch_local result:', result);
 
     if (result.status === "error") {

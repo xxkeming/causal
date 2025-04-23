@@ -95,12 +95,12 @@
           <n-button 
             class="tool-button" 
             text
-            :disabled="!canSendMessage && !props.loading"
+            :disabled="!canSendMessage && !globalStore.isLoading"
             @click="handleSendOrStop()"
           >
             <template #icon>
               <n-icon>
-                <component :is="props.loading ? PauseCircleOutline : SendOutline" />
+                <component :is="globalStore.isLoading ? PauseCircleOutline : SendOutline" />
               </n-icon>
             </template>
           </n-button>
@@ -112,6 +112,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useGlobalStore } from '../../../stores/globalStore';
 import { NInput, NButton, NIcon, NTooltip, useMessage } from 'naive-ui';
 import { 
   SendOutline, 
@@ -128,10 +129,11 @@ import { Attachment } from '../../../services/typings';
 import { convertFile } from '../../../services/api';
 
 const props = defineProps<{
-  loading: boolean;
   stream?: boolean; // 添加stream属性
   search?: boolean; // 添加联网搜索属性
 }>();
+
+const globalStore = useGlobalStore();
 
 const emit = defineEmits<{
   (e: 'send', text: string, attachments?: Attachment[]): void;
@@ -151,7 +153,7 @@ const fileIconStore = useFileIconStore();
 
 const canSendMessage = computed(() => 
   (inputMessage.value.trim() !== '' || selectedAttachments.value.length > 0) && 
-  !props.loading
+  !globalStore.isLoading
 );
 
 // 流式输出按钮样式类计算
@@ -200,6 +202,9 @@ async function handleFiles(files: File[]) {
   if (validFiles.length === 0) return;
 
   try {
+    // 开始转换时设置loading状态
+    globalStore.setLoadingState(true);
+    
     // 转换为 Attachment 对象
     const newAttachments = await Promise.all(validFiles.map(file => {
       return new Promise<Attachment>((resolve, reject) => {
@@ -237,6 +242,9 @@ async function handleFiles(files: File[]) {
   } catch (error) {
     console.error('文件处理失败:', error);
     message.error('文件处理失败');
+  } finally {
+    // 确保在完成后重置loading状态
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -278,7 +286,7 @@ function handleKeyDown(e: KeyboardEvent) {
 // 发送消息
 function sendMessage() {
   const text = inputMessage.value.trim();
-  if ((!text && selectedAttachments.value.length === 0) || props.loading) return;
+  if ((!text && selectedAttachments.value.length === 0) || globalStore.isLoading) return;
   
   emit('send', text, selectedAttachments.value.length > 0 ? [...selectedAttachments.value] : undefined);
   inputMessage.value = '';
@@ -287,7 +295,7 @@ function sendMessage() {
 
 // 处理发送或停止
 function handleSendOrStop() {
-  if (props.loading) {
+  if (globalStore.isLoading) {
     // 停止逻辑（如果需要）
     console.log('Stop action triggered');
   } else {

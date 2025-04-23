@@ -328,6 +328,81 @@
           </div>
         </n-tab-pane>
         
+        <!-- 添加自定义问题标签页 -->
+        <n-tab-pane name="questions" tab="预设问题">
+          <div class="tab-header-with-tooltip">
+            <div class="tab-header-title">
+              <n-icon size="18" class="tab-header-icon"><ChatbubbleOutline /></n-icon>
+              <span>设置常用问题，让用户快速了解智能体的功能和特点。</span>
+            </div>
+          </div>
+
+          <n-scrollbar style="max-height: 400px">
+            <div class="questions-list">
+              <!-- 问题列表 -->
+              <div v-for="(_question, index) in formModel.customQuestions" :key="index" class="question-item">
+                <div class="question-fields-row">
+                  <div class="question-title">
+                    <n-text strong>{{ index + 1 }}</n-text>
+                  </div>
+                  
+                  <n-input 
+                    v-model:value="formModel.customQuestions[index]" 
+                    type="text"
+                    placeholder="输入常用问题" 
+                    class="question-input"
+                  />
+                  
+                  <n-button
+                    circle
+                    quaternary
+                    type="error"
+                    size="small"
+                    @click="removeQuestion(index)"
+                    class="delete-button"
+                  >
+                    <template #icon><n-icon><TrashOutline /></n-icon></template>
+                  </n-button>
+                </div>
+              </div>
+              
+              <!-- 添加问题输入框 -->
+              <div class="question-item question-inline-add">
+                <div class="question-fields-row new-question-row">
+                  <div class="question-title">
+                    <n-text type="info">+</n-text>
+                  </div>
+                  
+                  <n-input 
+                    v-model:value="newQuestion"
+                    type="text"
+                    placeholder="添加新的常用问题" 
+                    class="question-input"
+                    @keyup.enter="addQuestion"
+                  />
+                  
+                  <n-button 
+                    circle 
+                    type="primary"
+                    size="small"
+                    @click="addQuestion"
+                    :disabled="!newQuestion"
+                    class="inline-add-button"
+                    title="添加问题"
+                  >
+                    <template #icon><n-icon><AddOutline /></n-icon></template>
+                  </n-button>
+                </div>
+              </div>
+
+              <!-- 提示文本 -->
+              <div v-if="formModel.customQuestions.length === 0" class="no-questions-tip">
+                <n-text depth="3">还没有自定义问题，请添加常见问题</n-text>
+              </div>
+            </div>
+          </n-scrollbar>
+        </n-tab-pane>
+
         <!-- 自定义参数标签页 -->
         <n-tab-pane name="params" tab="自定义参数">
           <div class="tab-header-with-tooltip">
@@ -428,80 +503,6 @@
           </n-scrollbar>
         </n-tab-pane>
         
-        <!-- 添加自定义问题标签页 -->
-        <n-tab-pane name="questions" tab="自定义问题">
-          <div class="tab-header-with-tooltip">
-            <div class="tab-header-title">
-              <n-icon size="18" class="tab-header-icon"><ChatbubbleOutline /></n-icon>
-              <span>设置常用问题，让用户快速了解智能体的功能和特点。</span>
-            </div>
-          </div>
-
-          <n-scrollbar style="max-height: 400px">
-            <div class="questions-list">
-              <!-- 问题列表 -->
-              <div v-for="(_question, index) in formModel.customQuestions" :key="index" class="question-item">
-                <div class="question-fields-row">
-                  <div class="question-title">
-                    <n-text strong>{{ index + 1 }}</n-text>
-                  </div>
-                  
-                  <n-input 
-                    v-model:value="formModel.customQuestions[index]" 
-                    type="text"
-                    placeholder="输入常用问题" 
-                    class="question-input"
-                  />
-                  
-                  <n-button
-                    circle
-                    quaternary
-                    type="error"
-                    size="small"
-                    @click="removeQuestion(index)"
-                    class="delete-button"
-                  >
-                    <template #icon><n-icon><TrashOutline /></n-icon></template>
-                  </n-button>
-                </div>
-              </div>
-              
-              <!-- 添加问题输入框 -->
-              <div class="question-item question-inline-add">
-                <div class="question-fields-row new-question-row">
-                  <div class="question-title">
-                    <n-text type="info">+</n-text>
-                  </div>
-                  
-                  <n-input 
-                    v-model:value="newQuestion"
-                    type="text"
-                    placeholder="添加新的常用问题" 
-                    class="question-input"
-                    @keyup.enter="addQuestion"
-                  />
-                  
-                  <n-button 
-                    circle 
-                    type="primary"
-                    size="small"
-                    @click="addQuestion"
-                    :disabled="!newQuestion"
-                    class="inline-add-button"
-                    title="添加问题"
-                  >
-                    <template #icon><n-icon><AddOutline /></n-icon></template>
-                  </n-button>
-                </div>
-              </div>
-
-              <!-- 提示文本 -->
-              <div v-if="formModel.customQuestions.length === 0" class="no-questions-tip">
-                <n-text depth="3">还没有自定义问题，请添加常见问题</n-text>
-              </div>
-            </div>
-          </n-scrollbar>
-        </n-tab-pane>
       </n-tabs>
     </n-scrollbar>
   </n-modal>

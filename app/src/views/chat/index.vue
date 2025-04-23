@@ -45,7 +45,6 @@
 
           <!-- 使用拆分出的输入组件 -->
           <chat-input 
-            :loading="globalStore.isLoading"
             v-model:stream="stream"
             v-model:search="search"
             @send="sendMessage"

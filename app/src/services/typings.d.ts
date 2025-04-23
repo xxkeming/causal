@@ -126,20 +126,31 @@ export interface Param {
   testValue?: string;
 }
 
+// tool
+export interface McpTool {
+  name: string;
+  description: string;
+  inputSchema?: Object;
+}
+
 // js
-export interface ToolScript {
+export interface ToolJavaScript {
+  type: 'javaScript';
   param?: Param[];
   code: string;
 }
 
 // mcp-io
 export interface ToolMcpIo {
+  type: 'mcpIo'
   path: string;
 }
 
 // mcp-sse
 export interface ToolMcpSse {
+  type: 'mcpSse';
   url: string;
+  tools: McpTool[];
 }
 
 // 工具
@@ -153,9 +164,8 @@ export interface Tool {
   name: string;
   description: string;
 
-  // js, mcp-io, mcp-sse
-  type: string;
-  data: ToolScript | ToolMcpIo | ToolMcpSse;
+  // 工具类型
+  data: ToolJavaScript | ToolMcpIo | ToolMcpSse;
 
   createdAt: i64;
   updatedAt?: i64;

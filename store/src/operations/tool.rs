@@ -151,7 +151,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Param, ToolData, ToolScript};
+    use crate::models::{McpTool, Param, ToolData, ToolJavaScript, ToolMcpSse};
     use chrono::Utc;
     use tempfile::tempdir;
 
@@ -219,8 +219,7 @@ mod tests {
             icon_id: Some(10),
             name: "测试工具".to_string(),
             description: "这是一个测试工具".to_string(),
-            tool_type: "js".to_string(),
-            data: ToolData::Script(ToolScript {
+            data: ToolData::JavsScript(ToolJavaScript {
                 param: Some(vec![Param {
                     name: "param1".to_string(),
                     param_type: "string".to_string(),
@@ -291,8 +290,7 @@ mod tests {
             icon_id: None,
             name: "工具1".to_string(),
             description: "工具1描述".to_string(),
-            tool_type: "js".to_string(),
-            data: ToolData::Script(ToolScript {
+            data: ToolData::JavsScript(ToolJavaScript {
                 param: None,
                 code: "function test() {}".to_string(),
             }),
@@ -306,10 +304,19 @@ mod tests {
             icon_id: None,
             name: "工具2".to_string(),
             description: "工具2描述".to_string(),
-            tool_type: "js".to_string(),
-            data: ToolData::Script(ToolScript {
-                param: None,
-                code: "function test() {}".to_string(),
+            data: ToolData::McpSse(ToolMcpSse {
+                url: "http://example.com".to_string(),
+                tools: vec![McpTool {
+                    name: "工具2".to_string(),
+                    description: "工具2描述".to_string(),
+                    input_schema: Some(serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "param1": { "type": "string" },
+                            "param2": { "type": "number" }
+                        }
+                    })),
+                }],
             }),
             created_at: Utc::now().timestamp(),
             updated_at: None,
@@ -321,8 +328,7 @@ mod tests {
             icon_id: None,
             name: "工具3".to_string(),
             description: "工具3描述".to_string(),
-            tool_type: "js".to_string(),
-            data: ToolData::Script(ToolScript {
+            data: ToolData::JavsScript(ToolJavaScript {
                 param: None,
                 code: "function test() {}".to_string(),
             }),
@@ -352,5 +358,37 @@ mod tests {
         // 类别2的工具仍然存在
         let remaining_tools = store.get_tools_by_category(2).unwrap();
         assert_eq!(remaining_tools.len(), 1);
+    }
+
+    #[test]
+    fn serial_test() {
+        let tool2 = Tool {
+            id: 2,
+            category_id: 1,
+            icon_id: None,
+            name: "工具2".to_string(),
+            description: "工具2描述".to_string(),
+            data: ToolData::McpSse(ToolMcpSse {
+                url: "http://example.com".to_string(),
+                tools: vec![McpTool {
+                    name: "工具2".to_string(),
+                    description: "工具2描述".to_string(),
+                    input_schema: Some(serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "param1": { "type": "string" },
+                            "param2": { "type": "number" }
+                        }
+                    })),
+                }],
+            }),
+            created_at: Utc::now().timestamp(),
+            updated_at: None,
+        };
+        let serialized = serde_json::to_string(&tool2).unwrap();
+        println!("Serialized Tool: {}", serialized);
+
+        let deserialized: Tool = serde_json::from_str(&serialized).unwrap();
+        println!("Deserialized Tool: {:?}", deserialized);
     }
 }

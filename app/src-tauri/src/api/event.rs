@@ -48,27 +48,39 @@ pub enum MessageEvent {
     },
 }
 
-async fn call_tools(name: &str, args: &str) -> Result<Value, Box<dyn std::error::Error>> {
+async fn call_tools(
+    tools: Arc<Vec<crate::openai::tool::Tool>>, name: &str, args: &str,
+) -> Result<Value, Box<dyn std::error::Error>> {
     println!("Calling function: {} with args: {}", name, args);
 
     let function_args: serde_json::Value = args.parse().unwrap();
+    for tool in tools.iter() {
+        if let Some(ref descriptions) = tool.description {
+            if descriptions.iter().any(|desc| desc.name == name) {
+                return Ok(tool.call(name, function_args).await.unwrap());
+            }
+        }
+    }
+
+    // Ok(tools::mcp_call(name, function_args).await.unwrap())
 
     // let x = function_args["x"].as_number().unwrap().as_i64().unwrap() as i32;
     // let y = function_args["y"].as_number().unwrap().as_i64().unwrap() as i32;
     // let sum = x + y;
 
-    // Ok(serde_json::json!({
-    //     "result": sum,
-    // }))
+    Ok(serde_json::json!({
+        "error": "not func",
+    }))
 
-    let query = function_args["query"].as_str().unwrap_or_default();
-    let search = tools::tavily_search(query).await?;
-    Ok(serde_json::to_value(search)?)
+    // let query = function_args["query"].as_str().unwrap_or_default();
+    // let search = tools::tavily_search(query).await?;
+    // Ok(serde_json::to_value(search)?)
 }
 
 async fn event_chat_stream(
-    client: &Client<OpenAIConfig>, request: CreateChatCompletionRequest,
-    messages: &mut Vec<ChatCompletionRequestMessage>, on_event: &tauri::ipc::Channel<MessageEvent>,
+    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<crate::openai::tool::Tool>>,
+    request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
+    on_event: &tauri::ipc::Channel<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
     // let prompt = messages.pop().unwrap();
 
@@ -125,12 +137,16 @@ async fn event_chat_stream(
                     let mut sets = JoinSet::new();
 
                     for (_, tool_call) in tool_call_states.into_iter() {
+                        let tool_objects = tool_objects.clone();
                         let tool_call_responses = tool_call_responses.clone();
                         sets.spawn(async move {
-                            let response_content =
-                                call_tools(&tool_call.function.name, &tool_call.function.arguments)
-                                    .await
-                                    .unwrap();
+                            let response_content = call_tools(
+                                tool_objects,
+                                &tool_call.function.name,
+                                &tool_call.function.arguments,
+                            )
+                            .await
+                            .unwrap();
                             tool_call_responses.lock().await.push((tool_call, response_content));
                         });
                     }
@@ -183,8 +199,9 @@ async fn event_chat_stream(
 }
 
 async fn event_chat(
-    client: &Client<OpenAIConfig>, request: CreateChatCompletionRequest,
-    messages: &mut Vec<ChatCompletionRequestMessage>, on_event: &tauri::ipc::Channel<MessageEvent>,
+    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<crate::openai::tool::Tool>>,
+    request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
+    on_event: &tauri::ipc::Channel<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
     // println!("messages: {:?}", messages);
 
@@ -199,10 +216,15 @@ async fn event_chat(
             for tool_call in tool_calls {
                 let name = tool_call.function.name.clone();
                 let args = tool_call.function.arguments.clone();
+
+                let tool_objects = tool_objects.clone();
                 let tool_call_clone = tool_call.clone();
 
                 sets.spawn(async move {
-                    (tool_call_clone, call_tools(&name, &args).await.unwrap_or_default())
+                    (
+                        tool_call_clone,
+                        call_tools(tool_objects, &name, &args).await.unwrap_or_default(),
+                    )
                 });
             }
 
@@ -362,28 +384,23 @@ pub async fn event(
         .with_api_key(provider.api_key.map(|key| key.to_string()).unwrap_or_default());
     let client = Client::with_config(config);
 
-    // let tools = vec![ChatCompletionToolArgs::default()
-    //     .r#type(ChatCompletionToolType::Function)
-    //     .function(
-    //         FunctionObjectArgs::default()
-    //             .name("fn_100000")
-    //             .description("Add x and y together")
-    //             .parameters(json!({
-    //                 "type": "object",
-    //                 "properties": {
-    //                     "x": {
-    //                         "type": "number",
-    //                         "description": "The first number to add"
-    //                     },
-    //                     "y": {
-    //                         "type": "number",
-    //                         "description": "The second number to add"
-    //                     }
-    //                 }
-    //             }))
-    //             .build()?,
-    //     )
-    //     .build()?];
+    // let tools = tools::mcp_tools()
+    //     .await
+    //     .unwrap()
+    //     .into_iter()
+    //     .map(|tool| {
+    //         ChatCompletionToolArgs::default()
+    //             .r#type(ChatCompletionToolType::Function)
+    //             .function(
+    //                 FunctionObjectArgs::default()
+    //                     .name(tool.name)
+    //                     .description(tool.description)
+    //                     .parameters(tool.schema)
+    //                     .build()?,
+    //             )
+    //             .build()
+    //     })
+    //     .collect::<Result<Vec<_>, _>>()?;
 
     // let tools = vec![ChatCompletionToolArgs::default()
     //     .r#type(ChatCompletionToolType::Function)
@@ -402,6 +419,44 @@ pub async fn event(
     //             .build()?,
     //     )
     //     .build()?];
+
+    let mut tool_objects = agent
+        .tools
+        .map(|id| {
+            id.iter()
+                .filter_map(|id| {
+                    store
+                        .get_tool(*id)
+                        .unwrap_or(None)
+                        .map(|tool| crate::openai::tool::Tool::new(tool))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or(Vec::new());
+
+    let mut tools = Vec::new();
+
+    for tool in tool_objects.iter_mut() {
+        let tool = tool
+            .description()
+            .await?
+            .into_iter()
+            .map(|tool| {
+                ChatCompletionToolArgs::default()
+                    .r#type(ChatCompletionToolType::Function)
+                    .function(
+                        FunctionObjectArgs::default()
+                            .name(tool.name)
+                            .description(tool.description)
+                            .parameters(tool.schema)
+                            .build()?,
+                    )
+                    .build()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        tools.extend(tool);
+    }
+    let tool_objects = Arc::new(tool_objects);
 
     let mut messages = vec![ChatCompletionRequestSystemMessageArgs::default()
         .content(agent.prompt.clone())
@@ -423,7 +478,7 @@ pub async fn event(
             .temperature(agent.temperature as f32)
             .top_p(agent.top_p as f32)
             .messages(messages.clone())
-            // .tools(tools.clone())
+            .tools(tools.clone())
             .build()?;
 
         if agent.max_tokens > 0 {
@@ -433,9 +488,10 @@ pub async fn event(
         // .top_p(agent.top_p as f32);
 
         let (is_continue, usage) = if stream {
-            event_chat_stream(&client, request, &mut messages, &on_event).await?
+            event_chat_stream(&client, tool_objects.clone(), request, &mut messages, &on_event)
+                .await?
         } else {
-            event_chat(&client, request, &mut messages, &on_event).await?
+            event_chat(&client, tool_objects.clone(), request, &mut messages, &on_event).await?
         };
 
         usages.push(usage);
