@@ -37,6 +37,16 @@ pub async fn ftech(
             let parsed_data: serde_json::Value = serde_json::to_value(list)?;
             Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
+        "search.set" => {
+            let search: store::Search = serde_json::from_str(data)?;
+            store.set_search(search)?;
+            Ok(serde_json::json!({ "status": "success" }))
+        }
+        "search.get" => {
+            let search = store.get_search()?;
+            let search: serde_json::Value = serde_json::to_value(search)?;
+            Ok(serde_json::json!({ "status": "success", "data": search }))
+        }
         "agent.add" => {
             let agent: store::Agent = serde_json::from_str(data)?;
             store.add_agent(agent)?;

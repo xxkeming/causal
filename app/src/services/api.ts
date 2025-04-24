@@ -3,6 +3,7 @@ import { mockKnowledgeBases } from './mock/knowledgeData';
 import { KnowledgeBase, KnowledgeBaseCategory } from './typings';
 import { ChatSession, ChatMessage } from './typings';
 import { Provider } from './typings';
+import { Search } from './typings'
 
 // 导入Tauri API
 import * as tauriApi from './tauriApi';
@@ -368,6 +369,16 @@ export async function chatEvent(agentId: number, sessionId: number, messageId: n
 
 export async function convertFile(name: string, data: string): Promise<string> {
   return tauriApi.fetch_local('file.convert', { name, data }) as Promise<string>;
+}
+
+// 获取搜索配置
+export async function getSearch(): Promise<Search> {
+  return tauriApi.fetch_local('search.get', null) as Promise<Search>;
+}
+
+// 设置搜索配置
+export async function setSearch(search: Search): Promise<boolean> {
+  return tauriApi.fetch_local('search.set', search) as Promise<boolean>;
 }
 
 // 导出Tauri相关API

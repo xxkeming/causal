@@ -23,7 +23,7 @@ pub struct McpTool {
     pub name: String,
     pub description: String,
     #[serde(rename = "inputSchema")]
-    pub input_schema: Option<serde_json::Value>,
+    pub input_schema: serde_json::Value,
 }
 
 /// JavaScript工具数据

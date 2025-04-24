@@ -7,20 +7,20 @@
           <div class="code-editor-header">
             <div class="editor-actions">
               <n-space>
-                <n-button quaternary size="small" @click="goBack">
+                <n-button quaternary size="small" :loading="globalStore.isLoading" @click="goBack">
                   <template #icon>
                     <n-icon><CloseOutline /></n-icon>
                   </template>
                   返回
                 </n-button>
-                <n-button quaternary size="small" :loading="testing" @click="testUrl">
+                <n-button quaternary size="small" :loading="globalStore.isLoading" @click="testUrl">
                   <template #icon><n-icon><PlayOutline /></n-icon></template>
                   测试连接
                 </n-button>
                 <n-button 
                   quaternary 
                   size="small" 
-                  :loading="saving" 
+                  :loading="globalStore.isLoading" 
                   :disabled="!testPassed"
                   @click="saveTool"
                 >
@@ -33,7 +33,7 @@
           
           <div class="code-editor-main">
             <div class="tool-list">
-              <n-spin :show="testing">
+              <n-spin :show="globalStore.isLoading">
                 <n-empty v-if="!toolForm.data.tools?.length" description="暂无工具" />
                 <n-list v-else>
                   <n-list-item v-for="tool in toolForm.data.tools" :key="tool.name">
@@ -119,6 +119,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { NForm, NFormItem, NInput, NButton, NIcon, NSelect, NSpace, NEmpty, NSpin, NList, NListItem } from 'naive-ui';
 import { CloseOutline, SaveOutline, PlayOutline } from '@vicons/ionicons5';
 import { useToolStore } from '../../stores/toolStore';
+import { useGlobalStore } from '../../stores/globalStore';
 import { useMessage } from 'naive-ui';
 import AvatarSelector from '../../components/AvatarSelector.vue';
 import type { Tool, ToolCategory, ToolMcpSse } from '../../services/typings';
@@ -137,12 +138,12 @@ const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const toolStore = useToolStore();
+const globalStore = useGlobalStore();
 
 const isEdit = computed(() => !!route.params.id);
 const toolId = computed(() => Number(route.params.id));
 
 const formRef = ref(null);
-const saving = ref(false);
 
 // 表单数据类型定义
 interface FormState {
@@ -214,7 +215,6 @@ async function fetchMcpTools() {
 }
 
 // 添加测试状态
-const testing = ref(false);
 const testPassed = ref(false);
 
 // 测试URL连接
@@ -224,7 +224,7 @@ async function testUrl() {
     return;
   }
 
-  testing.value = true;
+  globalStore.setLoadingState(true);
   try {
     const data = await getMcpSseTools(toolForm.data.url);
     toolForm.data.tools = data;
@@ -235,7 +235,7 @@ async function testUrl() {
     testPassed.value = false;
     toolForm.data.tools = [];
   } finally {
-    testing.value = false;
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -272,8 +272,8 @@ async function saveTool() {
     toolForm.categoryId = Number(toolForm.categoryId);
     
     // 所有验证都通过，现在开始保存
-    saving.value = true;
-    
+    globalStore.setLoadingState(true);
+
     if (isEdit.value) {
       console.log('更新', toolForm);
 
@@ -307,7 +307,7 @@ async function saveTool() {
     console.error('Failed to save tool:', error);
     message.error('保存失败：' + (error || '未知错误'));
   } finally {
-    saving.value = false;
+    globalStore.setLoadingState(false);
   }
 }
 

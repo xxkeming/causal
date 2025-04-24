@@ -309,13 +309,13 @@ mod tests {
                 tools: vec![McpTool {
                     name: "工具2".to_string(),
                     description: "工具2描述".to_string(),
-                    input_schema: Some(serde_json::json!({
+                    input_schema: serde_json::json!({
                         "type": "object",
                         "properties": {
                             "param1": { "type": "string" },
                             "param2": { "type": "number" }
                         }
-                    })),
+                    }),
                 }],
             }),
             created_at: Utc::now().timestamp(),
@@ -373,13 +373,13 @@ mod tests {
                 tools: vec![McpTool {
                     name: "工具2".to_string(),
                     description: "工具2描述".to_string(),
-                    input_schema: Some(serde_json::json!({
+                    input_schema: serde_json::json!({
                         "type": "object",
                         "properties": {
                             "param1": { "type": "string" },
                             "param2": { "type": "number" }
                         }
-                    })),
+                    }),
                 }],
             }),
             created_at: Utc::now().timestamp(),

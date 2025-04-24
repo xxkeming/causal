@@ -16,14 +16,13 @@ pub struct SearchResult {
     pub score: f32,
 }
 
-pub async fn tavily_search(query: &str) -> Result<Vec<SearchResult>, error::Error> {
-    let tavily = tavily::Tavily::builder("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")
+pub async fn tavily_search(
+    key: &str, result_count: u32, query: &str,
+) -> Result<Vec<SearchResult>, error::Error> {
+    let tavily = tavily::Tavily::builder(key)
         .timeout(std::time::Duration::from_secs(60))
-        .max_retries(5)
+        .max_retries(result_count)
         .build()?;
-
-    // let query = SearchRequest::new("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", query)
-    //     .include_raw_content(true);
 
     let results = tavily.search(query).await?;
 
@@ -121,7 +120,9 @@ mod test {
 
     #[tokio::test]
     async fn test_tavily() {
-        let results = tavily_search("rust是什么").await.unwrap();
+        let results = tavily_search("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", 5, "rust是什么")
+            .await
+            .unwrap();
         println!("result: {:?}", results);
     }
 

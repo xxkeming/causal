@@ -88,7 +88,8 @@ import {
   MoonOutline,
   ChatbubbleOutline,
   InformationCircleOutline,
-  SettingsOutline
+  SettingsOutline,
+  SearchOutline
 } from '@vicons/ionicons5'
 import { useRouter, useRoute } from 'vue-router'
 import { useThemeStore } from '../stores/themeStore'
@@ -110,6 +111,13 @@ const settingsOptions = [
     key: 'settings/model',
     icon: () => h('div', { class: 'dropdown-menu-icon' }, [
       h(NIcon, { size: 18, style: 'display:flex; align-items:center;' }, { default: () => h(SettingsOutline) })
+    ])
+  },
+  {
+    label: '搜索配置',
+    key: 'settings/search',
+    icon: () => h('div', { class: 'dropdown-menu-icon' }, [
+      h(NIcon, { size: 18, style: 'display:flex; align-items:center;' }, { default: () => h(SearchOutline) })
     ])
   },
   {

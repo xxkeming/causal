@@ -275,6 +275,28 @@ export interface ChatSession {
   updatedAt?: number;
 }
 
+export interface SearchTavily {
+  name: 'Tavily';
+  apiKey: string;
+}
+
+export interface SearchBaidu {
+  name: 'Baidu';
+  apiKey: string;
+}
+
+/// 搜索选项
+export interface Search {
+  // 服务类型
+  type: SearchTavily | SearchBaidu,
+
+  // 模式 先搜索, 工具智能搜索
+  mode: number,
+
+  // 保留几条搜索结果
+  resultCount: u32
+}
+
 // API 响应格式
 export interface ApiResponse<T = any> {
   code: number;
