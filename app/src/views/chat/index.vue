@@ -47,6 +47,7 @@
           <chat-input 
             v-model:stream="stream"
             v-model:search="search"
+            v-model:time="time"
             @send="sendMessage"
           />
         </template>
@@ -156,6 +157,7 @@ const agent = ref<Agent | null>(null);
 const siderCollapsed = ref(false);
 const stream = ref(true); // 添加stream状态
 const search = ref(false); // 添加联网搜索状态
+const time = ref(true); // 添加附件时间状态
 const providerConfigVisible = ref(false); // 添加状态
 const currentProvider = ref<Provider | undefined>(undefined); // 添加状态
 
@@ -300,7 +302,7 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
 async function sendApiMessage(agentId: number, sessionId: number, messageId: number, assistantIndex: number) {
   try {
     // 模拟流式输出，将文件信息传递给API
-    await chatEvent(agentId, sessionId, messageId, search.value, stream.value, async (event: MessageEvent) => {
+    await chatEvent(agentId, sessionId, messageId, search.value, time.value, stream.value, async (event: MessageEvent) => {
       switch (event.event) {
         case 'started':
           console.log('started');

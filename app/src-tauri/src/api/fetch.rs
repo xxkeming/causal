@@ -1,4 +1,5 @@
 use crate::error;
+use crate::openai::tool::{McpSseTool, ToolObject};
 
 pub async fn ftech(
     store: tauri::State<'_, store::Store>, name: &str, data: &str,
@@ -187,9 +188,9 @@ pub async fn ftech(
         }
         "tool.mcp.sse.tools" => {
             let url: String = serde_json::from_str(data)?;
-            match tools::McpSseTool::new(url).description().await {
-                Ok(description) => {
-                    Ok(serde_json::json!({ "status": "success", "data": description }))
+            match McpSseTool::try_new(url).await {
+                Ok(tool) => {
+                    Ok(serde_json::json!({ "status": "success", "data": tool.description() }))
                 }
                 Err(e) => Ok(serde_json::json!({ "status": "error", "error": e.to_string() })),
             }
@@ -266,7 +267,7 @@ pub async fn ftech(
             if let Some((title, data)) =
                 document::loader_from_data_base64(convert.name, convert.data)
             {
-                println!("convert title: {:?} data: {}", title, data.len());
+                tracing::info!("convert title: {:?} data: {}", title, data.len());
                 if data.len() > 0 {
                     return Ok(serde_json::json!({
                         "status": "success",

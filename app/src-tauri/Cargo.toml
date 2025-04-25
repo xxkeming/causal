@@ -20,18 +20,25 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-# tauri-plugin-window-state = "2"
+tauri-plugin-window-state = "2"
 
 tokio = { version = "1", features = ["full"] }
 futures = "*"
 
 async-openai = { workspace = true }
+tavily = "2.0.3"
+mcp-core = { version = "0.1.43", features = ["sse"] }
+
+time = "0.3.41"
 
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 thiserror = { workspace = true }
 
 store = { workspace = true }
 document = { workspace = true }
-tools = { workspace = true }
+# tools = { workspace = true }

@@ -55,7 +55,8 @@
         </n-tooltip>
 
         <!-- 右侧发送按钮 -->
-        <div class="toolbar-right">
+        <div class="toolbar-right"> 
+
           <!-- 联网搜索按钮 -->
           <n-tooltip trigger="hover" placement="top">
             <template #trigger>
@@ -74,6 +75,24 @@
             {{ props.search ? '联网模式' : '离线模式' }}
           </n-tooltip>
 
+          <!-- 添加时间按钮 -->
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                text
+                :class="timeButtonClass"
+                @click="$emit('update:time', !props.time)"
+              >
+                <template #icon>
+                  <n-icon>
+                    <TimeOutline />
+                  </n-icon>
+                </template>
+              </n-button>
+            </template>
+            {{ props.time ? '上下文包含当前时间' : '上下文不包含当前时间' }}
+          </n-tooltip>
+          
           <!-- 替换开关为图标按钮 -->
           <n-tooltip trigger="hover" placement="top">
             <template #trigger>
@@ -122,7 +141,8 @@ import {
   FlashOutline, // 添加流式输出图标
   FlashOffOutline, // 添加非流式输出图标
   Globe,    // 修改为正确的图标名称
-  GlobeOutline // 修改为正确的离线模式图标
+  GlobeOutline, // 修改为正确的离线模式图标
+  TimeOutline // 添加时间图标
 } from '@vicons/ionicons5';
 import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
 import { Attachment } from '../../../services/typings';
@@ -131,6 +151,7 @@ import { convertFile } from '../../../services/api';
 const props = defineProps<{
   stream?: boolean; // 添加stream属性
   search?: boolean; // 添加联网搜索属性
+  time?: boolean; // 添加time属性
 }>();
 
 const globalStore = useGlobalStore();
@@ -139,6 +160,7 @@ const emit = defineEmits<{
   (e: 'send', text: string, attachments?: Attachment[]): void;
   (e: 'update:stream', value: boolean): void;
   (e: 'update:search', value: boolean): void; // 添加事件
+  (e: 'update:time', value: boolean): void; // 添加时间事件
 }>();
 
 const inputMessage = ref('');
@@ -168,6 +190,13 @@ const searchButtonClass = computed(() => ({
   'tool-button': true,
   'search-active': props.search,
   'search-inactive': !props.search
+}));
+
+// 添加时间按钮样式计算
+const timeButtonClass = computed(() => ({
+  'tool-button': true,
+  'time-active': props.time,
+  'time-inactive': !props.time
 }));
 
 // 触发文件选择对话框
@@ -583,6 +612,15 @@ onMounted(() => {
 }
 
 .search-inactive {
+  color: #999 !important;
+}
+
+/* 添加时间按钮样式 */
+.time-active {
+  color: var(--primary-color) !important;
+}
+
+.time-inactive {
   color: #999 !important;
 }
 

@@ -1,18 +1,13 @@
-use std::{
-    collections::HashMap,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use async_openai::{
     config::OpenAIConfig,
     types::{
         ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestToolMessageArgs, ChatCompletionRequestUserMessageArgs,
-        ChatCompletionToolArgs, ChatCompletionToolType, CompletionUsage,
-        CreateChatCompletionRequest, CreateChatCompletionRequestArgs, FinishReason, FunctionCall,
-        FunctionObjectArgs,
+        ChatCompletionRequestToolMessageArgs, ChatCompletionToolArgs, ChatCompletionToolType,
+        CompletionUsage, CreateChatCompletionRequest, CreateChatCompletionRequestArgs,
+        FinishReason, FunctionCall, FunctionObjectArgs,
     },
     Client,
 };
@@ -20,10 +15,13 @@ use async_openai::{
 use futures::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
-use store::Search;
 use tokio::{sync::Mutex, task::JoinSet};
 
-use crate::error;
+use crate::{
+    error,
+    openai::chat,
+    openai::tool::{Search, Tool, ToolObject},
+};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
@@ -50,30 +48,15 @@ pub enum MessageEvent {
 }
 
 async fn call_tools(
-    search: Arc<Option<Search>>, tools: Arc<Vec<crate::openai::tool::Tool>>, name: &str, args: &str,
-) -> Result<Value, Box<dyn std::error::Error>> {
-    println!("Calling function: {} with args: {}", name, args);
+    tools: Arc<Vec<Box<dyn ToolObject>>>, name: String, args: String,
+) -> Result<Value, error::Error> {
+    tracing::info!("Calling function: {} with args: {}", name, args);
 
-    let function_args: serde_json::Value = args.parse().unwrap();
-
-    if let Some(ref search) = *search {
-        if name == "tavily_web_search" {
-            let store::SearchType::Tavily { ref api_key } = search.r#type;
-            let result = tools::tavily_search(
-                api_key,
-                search.result_count,
-                function_args["query"].as_str().unwrap_or_default(),
-            )
-            .await?;
-            return Ok(serde_json::to_value(result)?);
-        }
-    }
+    let function_args: serde_json::Value = args.parse()?;
 
     for tool in tools.iter() {
-        if let Some(ref descriptions) = tool.description {
-            if descriptions.iter().any(|desc| desc.name == name) {
-                return Ok(tool.call(name, function_args).await.unwrap());
-            }
+        if tool.description().iter().any(|desc| desc.name == name) {
+            return Ok(tool.call(&name, function_args).await?);
         }
     }
 
@@ -83,9 +66,9 @@ async fn call_tools(
 }
 
 async fn event_chat_stream(
-    client: &Client<OpenAIConfig>, search: Arc<Option<Search>>,
-    tool_objects: Arc<Vec<crate::openai::tool::Tool>>, request: CreateChatCompletionRequest,
-    messages: &mut Vec<ChatCompletionRequestMessage>, on_event: &tauri::ipc::Channel<MessageEvent>,
+    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Box<dyn ToolObject>>>,
+    request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
+    on_event: &tauri::ipc::Channel<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
     // let prompt = messages.pop().unwrap();
 
@@ -142,15 +125,13 @@ async fn event_chat_stream(
                     let mut sets = JoinSet::new();
 
                     for (_, tool_call) in tool_call_states.into_iter() {
-                        let search = search.clone();
                         let tool_objects = tool_objects.clone();
                         let tool_call_responses = tool_call_responses.clone();
                         sets.spawn(async move {
                             let response_content = call_tools(
-                                search,
                                 tool_objects,
-                                &tool_call.function.name,
-                                &tool_call.function.arguments,
+                                tool_call.function.name.clone(),
+                                tool_call.function.arguments.clone(),
                             )
                             .await
                             .unwrap();
@@ -194,8 +175,6 @@ async fn event_chat_stream(
                 }
             }
 
-            // println!("index: {:?}", chat_choice.index);
-
             if let Some(content) = chat_choice.delta.content {
                 on_event.send(MessageEvent::Chat { content }).map_err(|_| error::Error::Unknown)?;
             }
@@ -206,9 +185,9 @@ async fn event_chat_stream(
 }
 
 async fn event_chat(
-    client: &Client<OpenAIConfig>, search: Arc<Option<Search>>,
-    tool_objects: Arc<Vec<crate::openai::tool::Tool>>, request: CreateChatCompletionRequest,
-    messages: &mut Vec<ChatCompletionRequestMessage>, on_event: &tauri::ipc::Channel<MessageEvent>,
+    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Box<dyn ToolObject>>>,
+    request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
+    on_event: &tauri::ipc::Channel<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
     // println!("messages: {:?}", messages);
 
@@ -224,14 +203,13 @@ async fn event_chat(
                 let name = tool_call.function.name.clone();
                 let args = tool_call.function.arguments.clone();
 
-                let search = search.clone();
                 let tool_objects = tool_objects.clone();
                 let tool_call_clone = tool_call.clone();
 
                 sets.spawn(async move {
                     (
                         tool_call_clone,
-                        call_tools(search, tool_objects, &name, &args).await.unwrap_or_default(),
+                        call_tools(tool_objects, name, args).await.unwrap_or_default(),
                     )
                 });
             }
@@ -269,75 +247,9 @@ async fn event_chat(
     Ok((false, response.usage))
 }
 
-struct ChatMessage(store::ChatMessage);
-
-impl Deref for ChatMessage {
-    type Target = store::ChatMessage;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ChatMessage {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl ChatMessage {
-    pub fn new_user(message: store::ChatMessage) -> Result<Self, error::Error> {
-        if message.role != store::Role::User {
-            return Err(error::Error::InvalidData(format!(
-                "Message with id {} is not a user message",
-                message.id
-            )));
-        }
-        Ok(Self::new(message, true))
-    }
-
-    pub fn new(mut message: store::ChatMessage, context_extend: bool) -> Self {
-        if context_extend {
-            if let Some(attachments) = message.attachments.as_ref() {
-                let attachments = attachments
-                    .into_iter()
-                    .map(|attachment| {
-                        format!(
-                            "<attachment><name>{}</name><data>{}</data></attachment>",
-                            attachment.name, attachment.data
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                message.content = format!("{}\n\n{}", attachments, message.content);
-            }
-        }
-
-        Self(message)
-    }
-}
-
-impl TryFrom<ChatMessage> for ChatCompletionRequestMessage {
-    type Error = error::Error;
-
-    fn try_from(message: ChatMessage) -> Result<Self, Self::Error> {
-        if message.0.role == store::Role::User {
-            Ok(ChatCompletionRequestUserMessageArgs::default()
-                .content(message.0.content)
-                .build()?
-                .into())
-        } else {
-            Ok(ChatCompletionRequestAssistantMessageArgs::default()
-                .content(message.0.content)
-                .build()?
-                .into())
-        }
-    }
-}
-
 pub async fn event(
     store: tauri::State<'_, store::Store>, agent_id: u64, session_id: u64, message_id: u64,
-    search: bool, stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
+    search: bool, time: bool, stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
     let Some(agent) = store.get_agent(agent_id)? else {
         return Err(error::Error::InvalidData(format!("Agent with id {agent_id} not found")));
@@ -360,7 +272,7 @@ pub async fn event(
         agent.context_size as usize * 2 + 1,
     )?;
     for context in contexts.iter() {
-        println!("Message: {:?}", context.content);
+        tracing::info!("Message: {:?}", context.content);
     }
 
     let Some(context) = contexts.pop() else {
@@ -369,27 +281,35 @@ pub async fn event(
             message_id - 1
         )));
     };
-    let mut context = ChatMessage::new_user(context)?;
+    let mut context = chat::Message::new_user(context)?;
 
-    let search = if search { Some(store.get_search()?) } else { None };
+    let mut search = if search { Some(store.get_search()?) } else { None };
+
+    // 上下文附加当前时间
+    if time {
+        context.content =
+            format!("{}\n\ncurrent utc time:{}\n\n", context.content, time::UtcDateTime::now());
+        // tracing::info!("Message: {:?}", context.content);
+    }
 
     // 先联网搜索
-    if search.as_ref().map(|v| v.mode == 1).unwrap_or(false) {
-        let search = search.as_ref().unwrap();
-        let store::SearchType::Tavily { ref api_key } = search.r#type;
+    if let Some(search) = search.take_if(|v| v.mode == 1) {
+        let search = Search::new(search).into_tool_object()?;
 
-        let search = tools::tavily_search(&api_key, search.result_count, context.content.as_ref())
-            .await
-            .map_err(|e| error::Error::InvalidData(format!("{:?}", e)))?;
-        let search = search
-            .into_iter()
-            .map(|item| {
-                format!("<search><name>{}</name><data>{}</data></search>", item.title, item.content)
+        let query = json!({"query": context.content.clone()});
+        let search = search.call("search", query.clone()).await?;
+
+        on_event
+            .send(MessageEvent::Tool {
+                id: "0".to_string(),
+                name: "web search".to_string(),
+                arguments: query.to_string(),
+                result: search.to_string(),
             })
-            .collect::<Vec<_>>()
-            .join("\n");
-        println!("Search: {:?}", search);
-        context.content = format!("{}\n\n{}", context.content, search);
+            .map_err(|_| error::Error::Unknown)?;
+
+        context.content =
+            format!("{}\n\nweb search results\n{}\n\n", context.content, search.to_string());
     }
 
     let config = async_openai::config::OpenAIConfig::new()
@@ -397,65 +317,30 @@ pub async fn event(
         .with_api_key(provider.api_key.map(|key| key.to_string()).unwrap_or_default());
     let client = Client::with_config(config);
 
-    let mut tool_objects = agent
+    let tools = agent
         .tools
         .map(|id| {
-            id.iter()
-                .filter_map(|id| {
-                    store
-                        .get_tool(*id)
-                        .unwrap_or(None)
-                        .map(|tool| crate::openai::tool::Tool::new(tool))
-                })
-                .collect::<Vec<_>>()
+            id.iter().filter_map(|id| store.get_tool(*id).unwrap_or(None)).collect::<Vec<_>>()
         })
         .unwrap_or(Vec::new());
+
+    let mut tool_objects = Vec::new();
+    for tool in tools.into_iter() {
+        tool_objects.push(Tool::new(tool).into_tool_object().await?);
+    }
 
     let mut tools = Vec::new();
 
     // 先联网搜索工具方式
-    if search.as_ref().map(|v| v.mode == 2).unwrap_or(false) {
-        tools.push(
-            ChatCompletionToolArgs::default()
-                .r#type(ChatCompletionToolType::Function)
-                .function(
-                    FunctionObjectArgs::default()
-                        .name("tavily_web_search")
-                        .description(
-                            "Useful for when you need to answer questions by searching the web.",
-                        )
-                        .parameters(json!({
-                            "type": "object",
-                            "properties": {
-                                "query": {
-                                    "type": "string"
-                                }
-                            }
-                        }))
-                        .build()?,
-                )
-                .build()?,
-        );
+    if let Some(search) = search.take_if(|v| v.mode == 2) {
+        tool_objects.push(Search::new(search).into_tool_object()?);
     }
-    let search = Arc::new(search);
 
-    for tool in tool_objects.iter_mut() {
+    for tool in tool_objects.iter() {
         let tool = tool
             .description()
-            .await?
             .into_iter()
-            .map(|tool| {
-                ChatCompletionToolArgs::default()
-                    .r#type(ChatCompletionToolType::Function)
-                    .function(
-                        FunctionObjectArgs::default()
-                            .name(tool.name)
-                            .description(tool.description)
-                            .parameters(tool.schema)
-                            .build()?,
-                    )
-                    .build()
-            })
+            .map(|tool| tool.try_into())
             .collect::<Result<Vec<_>, _>>()?;
         tools.extend(tool);
     }
@@ -467,7 +352,7 @@ pub async fn event(
         .into()];
 
     for context in contexts.into_iter() {
-        messages.push(ChatMessage::new(context, agent.context_extend).try_into()?);
+        messages.push(chat::Message::new(context, agent.context_extend).try_into()?);
     }
     messages.push(context.try_into()?);
 
@@ -488,28 +373,11 @@ pub async fn event(
             request.max_completion_tokens = Some(agent.max_tokens);
         }
 
-        // .top_p(agent.top_p as f32);
-
         let (is_continue, usage) = if stream {
-            event_chat_stream(
-                &client,
-                search.clone(),
-                tool_objects.clone(),
-                request,
-                &mut messages,
-                &on_event,
-            )
-            .await?
+            event_chat_stream(&client, tool_objects.clone(), request, &mut messages, &on_event)
+                .await?
         } else {
-            event_chat(
-                &client,
-                search.clone(),
-                tool_objects.clone(),
-                request,
-                &mut messages,
-                &on_event,
-            )
-            .await?
+            event_chat(&client, tool_objects.clone(), request, &mut messages, &on_event).await?
         };
 
         usages.push(usage);
@@ -535,7 +403,7 @@ pub async fn event(
         completion_tokens: completion_tokens,
         total_tokens: total_tokens,
     };
-    println!("Finished: {:?}", finised);
+    tracing::info!("Finished: {:?}", finised);
 
     on_event.send(finised).map_err(|_| error::Error::Unknown)?;
 

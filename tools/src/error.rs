@@ -5,4 +5,7 @@ pub enum Error {
 
     #[error("Tavily error: {0}")]
     TavilyError(#[from] tavily::TavilyError),
+
+    #[error("json error: {0}")]
+    JsonError(#[from] serde_json::Error),
 }

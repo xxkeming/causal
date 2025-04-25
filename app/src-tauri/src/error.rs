@@ -15,12 +15,18 @@ pub enum Error {
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("tools error: {0}")]
-    Tools(#[from] tools::Error),
+    #[error("Mcp error: {0}")]
+    McpError(String),
+
+    #[error("Tavily error: {0}")]
+    TavilyError(#[from] tavily::TavilyError),
 
     #[error("Unknown data")]
     Unknown,
 }
+
+unsafe impl Send for Error {}
+unsafe impl Sync for Error {}
 
 impl From<Error> for serde_json::Value {
     fn from(e: Error) -> Self {
