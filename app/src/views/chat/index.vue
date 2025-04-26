@@ -49,6 +49,7 @@
             v-model:search="search"
             v-model:time="time"
             @send="sendMessage"
+            @send-exit="sendMessageAndExit"
           />
         </template>
 
@@ -111,7 +112,7 @@ import { useAgentStore } from '../../stores/agentStore';
 import { useIconStore } from '../../stores/iconStore';
 import { useChatSessionStore } from '../../stores/chatSessionStore';
 import { useProviderStore} from '../../stores/providerStore';
-import { chatEvent, MessageEvent  } from '../../services/api';
+import { chatEvent, chatEventExit, MessageEvent  } from '../../services/api';
 import * as api from '../../services/api';
 import { useGlobalStore } from '../../stores/globalStore';
 
@@ -151,6 +152,7 @@ const globalStore = useGlobalStore(); // 添加 globalStore
 const currentSessionId = ref<number | null>(null);
 const currentSession = ref<ChatSession | null>(null);
 const messages = ref<ChatMessage[]>([]);
+const currentMessageId = ref<number | null>(null);
 
 // 状态
 const agent = ref<Agent | null>(null);
@@ -245,6 +247,10 @@ function scrollToBottom() {
   });
 }
 
+async function sendMessageAndExit() {
+  chatEventExit(currentMessageId.value as number);
+}
+
 // 发送消息
 async function sendMessage(text: string, attachments?: Attachment[]) {
   if ((!text && (!attachments || attachments.length === 0)) || globalStore.isLoading) return;
@@ -301,6 +307,8 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
 
 async function sendApiMessage(agentId: number, sessionId: number, messageId: number, assistantIndex: number) {
   try {
+    currentMessageId.value = messageId;
+
     // 模拟流式输出，将文件信息传递给API
     await chatEvent(agentId, sessionId, messageId, search.value, time.value, stream.value, async (event: MessageEvent) => {
       switch (event.event) {
@@ -377,6 +385,8 @@ async function retryMessage(index: number) {
   }
 
   try {
+    globalStore.setLoadingState(true);
+
     messages.value[index].content = ''; // 清空当前消息内容
     messages.value[index].tools = []; // 清空工具结果
     messages.value[index].status = 'sending'; // 设置状态为发送中
@@ -391,7 +401,6 @@ async function retryMessage(index: number) {
   } finally {
     globalStore.setLoadingState(false);
   }
-  
 }
 
 // 删除消息函数
@@ -572,11 +581,13 @@ async function handleModelChange(newModel: any) {
 
 // 显示配置弹窗
 function showAgentConfig() {
+  if (globalStore.isLoading) return;
   agentConfigVisible.value = true;
 }
 
 // 修改模型提供商配置函数
 async function showProviderConfig() {
+  if (globalStore.isLoading) return;
   if (agent.value?.model?.id) {
     try {
       // 获取提供商详情

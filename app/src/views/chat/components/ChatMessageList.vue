@@ -30,7 +30,7 @@
             </div>
             
             <!-- 消息操作按钮 -->
-            <div class="message-actions" v-if="message.status === 'success' || message.status === 'error'">
+            <div class="message-actions" v-if="(message.status === 'success' || message.status === 'error') || !loading">
               
               <!-- 反馈按钮：仅AI消息显示 -->
               <template v-if="message.role === 'assistant'">

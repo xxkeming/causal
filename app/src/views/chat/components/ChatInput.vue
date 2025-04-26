@@ -158,6 +158,7 @@ const globalStore = useGlobalStore();
 
 const emit = defineEmits<{
   (e: 'send', text: string, attachments?: Attachment[]): void;
+  (e: 'sendExit'): void;
   (e: 'update:stream', value: boolean): void;
   (e: 'update:search', value: boolean): void; // 添加事件
   (e: 'update:time', value: boolean): void; // 添加时间事件
@@ -325,8 +326,7 @@ function sendMessage() {
 // 处理发送或停止
 function handleSendOrStop() {
   if (globalStore.isLoading) {
-    // 停止逻辑（如果需要）
-    console.log('Stop action triggered');
+    emit('sendExit');
   } else {
     sendMessage();
   }

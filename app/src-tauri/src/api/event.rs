@@ -5,9 +5,8 @@ use async_openai::{
     types::{
         ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestToolMessageArgs, ChatCompletionToolArgs, ChatCompletionToolType,
-        CompletionUsage, CreateChatCompletionRequest, CreateChatCompletionRequestArgs,
-        FinishReason, FunctionCall, FunctionObjectArgs,
+        ChatCompletionRequestToolMessageArgs, ChatCompletionToolType, CompletionUsage,
+        CreateChatCompletionRequest, CreateChatCompletionRequestArgs, FinishReason, FunctionCall,
     },
     Client,
 };
@@ -15,13 +14,22 @@ use async_openai::{
 use futures::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
-use tokio::{sync::Mutex, task::JoinSet};
+use tokio::{
+    sync::{Mutex, RwLock},
+    task::JoinSet,
+};
 
 use crate::{
     error,
     openai::chat,
     openai::tool::{Search, Tool, ToolObject},
 };
+
+pub struct MessageTask {
+    pub exit: tokio::sync::watch::Sender<()>,
+}
+
+pub type MessageTasks = Arc<RwLock<HashMap<u64, MessageTask>>>;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
@@ -248,8 +256,9 @@ async fn event_chat(
 }
 
 pub async fn event(
-    store: tauri::State<'_, store::Store>, agent_id: u64, session_id: u64, message_id: u64,
-    search: bool, time: bool, stream: bool, on_event: tauri::ipc::Channel<MessageEvent>,
+    tasks: tauri::State<'_, MessageTasks>, store: tauri::State<'_, store::Store>, agent_id: u64,
+    session_id: u64, message_id: u64, search: bool, time: bool, stream: bool,
+    on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
     let Some(agent) = store.get_agent(agent_id)? else {
         return Err(error::Error::InvalidData(format!("Agent with id {agent_id} not found")));
@@ -285,13 +294,6 @@ pub async fn event(
 
     let mut search = if search { Some(store.get_search()?) } else { None };
 
-    // 上下文附加当前时间
-    if time {
-        context.content =
-            format!("{}\n\ncurrent utc time:{}\n\n", context.content, time::UtcDateTime::now());
-        // tracing::info!("Message: {:?}", context.content);
-    }
-
     // 先联网搜索
     if let Some(search) = search.take_if(|v| v.mode == 1) {
         let search = Search::new(search).into_tool_object()?;
@@ -310,6 +312,13 @@ pub async fn event(
 
         context.content =
             format!("{}\n\nweb search results\n{}\n\n", context.content, search.to_string());
+    }
+
+    // 上下文附加当前时间
+    if time {
+        context.content =
+            format!("{}\n\ncurrent utc time:{}\n\n", context.content, time::UtcDateTime::now());
+        // tracing::info!("Message: {:?}", context.content);
     }
 
     let config = async_openai::config::OpenAIConfig::new()
@@ -356,31 +365,58 @@ pub async fn event(
     }
     messages.push(context.try_into()?);
 
-    on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
+    // on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
 
     let mut usages = Vec::new();
     let cost = std::time::Instant::now();
+
+    let (tx, mut rx) = tokio::sync::watch::channel(());
+    tasks.write().await.insert(message_id, MessageTask { exit: tx });
+
     loop {
-        let mut request = CreateChatCompletionRequestArgs::default()
-            .model(model.name.clone())
-            .temperature(agent.temperature as f32)
-            .top_p(agent.top_p as f32)
-            .messages(messages.clone())
-            .tools(tools.clone())
-            .build()?;
+        let task = async {
+            let mut request = CreateChatCompletionRequestArgs::default()
+                .model(model.name.clone())
+                .temperature(agent.temperature as f32)
+                .top_p(agent.top_p as f32)
+                .messages(messages.clone())
+                .build()?;
 
-        if agent.max_tokens > 0 {
-            request.max_completion_tokens = Some(agent.max_tokens);
-        }
+            if tools.len() > 0 {
+                request.tools = Some(tools.clone());
+            }
 
-        let (is_continue, usage) = if stream {
-            event_chat_stream(&client, tool_objects.clone(), request, &mut messages, &on_event)
-                .await?
-        } else {
-            event_chat(&client, tool_objects.clone(), request, &mut messages, &on_event).await?
+            if agent.max_tokens > 0 {
+                request.max_completion_tokens = Some(agent.max_tokens);
+            }
+
+            let (is_continue, usage) = if stream {
+                event_chat_stream(&client, tool_objects.clone(), request, &mut messages, &on_event)
+                    .await?
+            } else {
+                event_chat(&client, tool_objects.clone(), request, &mut messages, &on_event).await?
+            };
+            Ok::<_, error::Error>((is_continue, usage))
         };
 
-        usages.push(usage);
+        let (is_continue, usage) = tokio::select! {
+            _ = rx.changed() => {
+                tracing::info!("Message task {} exit", message_id);
+                (false, None)
+            }
+            result = task => {
+                tracing::info!("Message task {} finished {result:?}", message_id);
+                if result.as_ref().map(|r|!r.0).unwrap_or(true) {
+                    tasks.write().await.remove(&message_id);
+                }
+                result?
+            }
+        };
+
+        if let Some(usage) = usage {
+            usages.push(usage);
+        }
+
         if !is_continue {
             break;
         }
@@ -388,7 +424,7 @@ pub async fn event(
 
     let (prompt_tokens, completion_tokens, total_tokens) = usages
         .into_iter()
-        .filter_map(|usage| usage)
+        // .filter_map(|usage| usage)
         .fold((0, 0, 0), |(prompt, completion, total), usage| {
             (
                 prompt + usage.prompt_tokens,

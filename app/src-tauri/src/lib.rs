@@ -14,12 +14,26 @@ async fn fetch(
 
 #[tauri::command]
 async fn event(
-    store: tauri::State<'_, store::Store>, agent: u64, session: u64, message: u64, search: bool,
-    time: bool, stream: bool, on_event: tauri::ipc::Channel<api::event::MessageEvent>,
+    tasks: tauri::State<'_, api::event::MessageTasks>, store: tauri::State<'_, store::Store>,
+    agent: u64, session: u64, message: u64, search: bool, time: bool, stream: bool,
+    on_event: tauri::ipc::Channel<api::event::MessageEvent>,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::event::event(store, agent, session, message, search, time, stream, on_event)
+    api::event::event(tasks, store, agent, session, message, search, time, stream, on_event)
         .await
         .map_err(|e| e.into())
+}
+
+#[tauri::command]
+async fn event_exit(
+    tasks: tauri::State<'_, api::event::MessageTasks>, message: u64,
+) -> Result<serde_json::Value, serde_json::Value> {
+    let mut tasks = tasks.write().await;
+    if let Some(task) = tasks.remove(&message) {
+        let _ = task.exit.send(());
+    }
+    Ok(serde_json::json!({
+        "status": "success"
+    }))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -43,11 +57,15 @@ pub async fn run() {
     // 打开数据库
     let store = store::Store::open(format!("{}/store", causal_dir)).unwrap();
 
+    // 任务列表
+    let tasks = api::event::MessageTasks::default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![fetch, event])
+        .invoke_handler(tauri::generate_handler![fetch, event, event_exit])
         .manage(store)
+        .manage(tasks)
         // .manage(causal_dir)
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

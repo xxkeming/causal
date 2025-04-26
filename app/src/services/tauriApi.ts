@@ -90,6 +90,23 @@ export async function event_local(agentId: number, sessionId: number, messageId:
   }
 }
 
+export async function event_exit_local(messageId: number): Promise<Object> {
+  try {
+    console.log('event_exit_local:', messageId);
+    
+    let result = await invoke('event_exit', { message: messageId }) as Response;
+    console.log('event_exit_local result:', result);
+
+    if (result.status === "error") {
+      throw 'error:' + result.error;
+    }
+    return result.data === undefined ? true : result.data as Object;
+  } catch (error) {
+    console.error('Failed to call event_exit_local function:', error);
+    throw error;
+  }
+}
+
 // 转换各种文档为md格式
 export async function convert(name: string, data: string) {
   try {
