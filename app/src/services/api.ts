@@ -385,6 +385,18 @@ export async function setSearch(search: Search): Promise<boolean> {
   return tauriApi.fetch_local('search.set', search) as Promise<boolean>;
 }
 
+export async function appName(): Promise<string> {
+  return tauriApi.app_name() as Promise<string>;
+}
+
+export async function appVersion(): Promise<string> {
+  return tauriApi.app_version() as Promise<string>;
+}
+
+export async function appDate(): Promise<string> {
+  return tauriApi.app_date() as Promise<string>;
+}
+
 // 导出Tauri相关API
 export const openInPath = tauriApi.openInPath;
 export const openInUrl = tauriApi.openInUrl;

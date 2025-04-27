@@ -159,7 +159,7 @@ const agent = ref<Agent | null>(null);
 const siderCollapsed = ref(false);
 const stream = ref(true); // 添加stream状态
 const search = ref(false); // 添加联网搜索状态
-const time = ref(true); // 添加附件时间状态
+const time = ref(false); // 添加附件时间状态
 const providerConfigVisible = ref(false); // 添加状态
 const currentProvider = ref<Provider | undefined>(undefined); // 添加状态
 
@@ -231,8 +231,14 @@ function addMessage(message: ChatMessage) {
   // 如果是有会话的情况，更新会话的更新时间
   if (currentSessionId.value) {
     const timestamp = Date.now();
+
     chatSessionStore.updateSession(currentSessionId.value, {
-      updatedAt: timestamp
+      updatedAt: timestamp,
+      input: {
+        search: search.value,
+        time: time.value,
+        stream: stream.value
+      }
     });
   }
 }
@@ -497,7 +503,11 @@ async function switchSession(sessionId: number) {
   if (session) {
     currentSessionId.value = sessionId;
     currentSession.value = session;
-    
+
+    time.value = session.input.time;
+    search.value = session.input.search;
+    stream.value = session.input.stream;
+
     // 加载会话相关数据
     await loadSessionMessages(sessionId);
     

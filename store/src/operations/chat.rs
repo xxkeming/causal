@@ -268,7 +268,10 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{ChatMessage, ChatSession, MessageStatus, Role};
+    use crate::{
+        ChatInput,
+        models::{ChatMessage, ChatSession, MessageStatus, Role},
+    };
     use chrono::Utc;
     use tempfile::tempdir;
 
@@ -283,6 +286,7 @@ mod tests {
             id: 1,
             agent_id: 200,
             topic: "测试聊天会话".to_string(),
+            input: ChatInput::default(),
             created_at: 0, // 将被自动设置
             updated_at: None,
         };
@@ -331,6 +335,7 @@ mod tests {
             id: 1,
             agent_id: 200,
             topic: "测试会话".to_string(),
+            input: ChatInput::default(),
             created_at: 0,
             updated_at: None,
         };

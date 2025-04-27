@@ -260,6 +260,13 @@ export interface ChatMessage {
   updatedAt?: number;
 }
 
+// 会话输入状态
+export interface ChatInput {
+  time: boolean;
+  search: boolean;
+  stream: boolean;
+}
+
 // 聊天会话信息
 export interface ChatSession {
   // 会话id
@@ -271,6 +278,8 @@ export interface ChatSession {
   // 会话主题
   topic: string;
 
+  input: ChatInput;
+  
   createdAt: number;
   updatedAt?: number;
 }

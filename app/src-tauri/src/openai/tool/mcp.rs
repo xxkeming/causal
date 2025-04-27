@@ -21,7 +21,10 @@ impl McpSseTool {
 
         client
             .initialize(
-                Implementation { name: "causal studio".to_string(), version: "1.0".to_string() },
+                Implementation {
+                    name: env!("CARGO_PKG_NAME").to_string(),
+                    version: env!("CARGO_PKG_VERSION").to_string(),
+                },
                 ClientCapabilities::default(),
             )
             .await

@@ -91,6 +91,19 @@ pub struct ChatMessage {
     pub created_at: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChatInput {
+    time: bool,
+    search: bool,
+    stream: bool,
+}
+
+impl Default for ChatInput {
+    fn default() -> Self {
+        Self { time: false, search: false, stream: true }
+    }
+}
+
 /// 聊天会话
 #[derive(Debug, Serialize, Deserialize, Collection, Clone)]
 #[collection(name = "chat_sessions", primary_key = u64)]
@@ -103,6 +116,9 @@ pub struct ChatSession {
     pub agent_id: u64,
     /// 会话主题
     pub topic: String,
+    /// 输入状态
+    #[serde(default)]
+    pub input: ChatInput,
     /// 创建时间
     #[serde(rename = "createdAt")]
     pub created_at: i64,

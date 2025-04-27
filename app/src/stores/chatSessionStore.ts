@@ -51,7 +51,12 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     try {
       const newSession = await api.addSession({
         agentId,
-        topic
+        topic,
+        input: {
+          time: false,
+          search: false,
+          stream: true
+        }
       });
       
       // 将新会话添加到本地状态

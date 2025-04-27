@@ -125,6 +125,18 @@ export async function convert(name: string, data: string) {
   }
 }
 
+export async function app_name() {
+  return await invoke('app_name', { }) as string;
+}
+
+export async function app_version() {
+  return await invoke('app_version', { }) as string;
+}
+
+export async function app_date() {
+  return await invoke('app_date', { }) as string;
+}
+
 export async function openInPath(path: string) {
   await openPath(path);
 }

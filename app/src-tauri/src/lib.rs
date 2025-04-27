@@ -6,6 +6,21 @@ use tauri::Manager;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 #[tauri::command]
+async fn app_name() -> String {
+    "Causal Studio".to_string()
+}
+
+#[tauri::command]
+async fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
+async fn app_date() -> String {
+    "2025-04-26".to_string()
+}
+
+#[tauri::command]
 async fn fetch(
     store: tauri::State<'_, store::Store>, name: String, data: String,
 ) -> Result<serde_json::Value, serde_json::Value> {
@@ -54,6 +69,8 @@ pub async fn run() {
         .with_max_level(tracing::Level::INFO)
         .init();
 
+    tracing::info!("Version from cargo.toml: {}", env!("CARGO_PKG_NAME"));
+
     // 打开数据库
     let store = store::Store::open(format!("{}/store", causal_dir)).unwrap();
 
@@ -63,7 +80,14 @@ pub async fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![fetch, event, event_exit])
+        .invoke_handler(tauri::generate_handler![
+            app_name,
+            app_version,
+            app_date,
+            fetch,
+            event,
+            event_exit
+        ])
         .manage(store)
         .manage(tasks)
         // .manage(causal_dir)

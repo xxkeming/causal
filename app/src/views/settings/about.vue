@@ -9,9 +9,9 @@
             <img src="/logo.png" alt="AI Test Logo" class="logo-image" />
           </div>
           <div class="app-details">
-            <h2>AI Test</h2>
-            <p class="version">版本 {{ appVersion }}</p>
-            <p class="build-info">构建日期: {{ buildDate }}</p>
+            <h2>{{ appN }}</h2>
+            <p class="version">版本 {{ appV }}</p>
+            <p class="build-info">构建日期: {{ appD }}</p>
             <div class="action-buttons">
               <n-button @click="checkForUpdates" :loading="checkingUpdate" type="primary" size="small">
                 检查更新
@@ -56,7 +56,7 @@
         <n-divider />
 
         <div class="copyright">
-          <p>© {{ currentYear }} AI Test 团队. 保留所有权利。</p>
+          <p>© {{ currentYear }} { appN } 团队. 保留所有权利。</p>
         </div>
       </div>
     </div>
@@ -64,15 +64,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { NButton, NDivider, NDescriptions, NDescriptionsItem, NTag, NList, NListItem, NThing, useMessage } from 'naive-ui';
+import { appName, appVersion, appDate } from '../../services/api';
 
 const message = useMessage();
 const checkingUpdate = ref(false);
 
 // 应用信息
-const appVersion = ref('1.0.0');
-const buildDate = ref('2024-03-01');
+const appN = ref<string>('');
+const appV = ref<string>('');
+const appD = ref<string>('');
+
+onMounted(async () => {
+  appN.value = await appName();
+  appV.value = await appVersion();
+  appD.value = await appDate();
+})
 
 // 当前年份
 const currentYear = computed(() => new Date().getFullYear());
