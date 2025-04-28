@@ -14,6 +14,8 @@
         class="chat-input"
         @keydown="handleKeyDown"
         :show-count="false"
+        :spellcheck="false"
+        :autocomplete="false"
       />
       
       <div class="input-toolbar">
@@ -386,7 +388,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background-color: rgba(247, 248, 250, 0.95);  /* 修改为浅灰色背景 */
+  background-color: rgb(237, 237, 239);
   padding: 4px 6px;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -412,7 +414,7 @@ onMounted(() => {
 
 .chat-input :deep(.n-input-wrapper) {
   padding: 0px 12px;
-  background-color: rgba(247, 248, 250, 0.95);  /* 修改为与容器相同的背景色 */
+  background-color: rgb(237, 237, 239);
 }
 
 .chat-input :deep(textarea) {

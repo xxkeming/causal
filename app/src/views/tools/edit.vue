@@ -12,6 +12,12 @@
       :category-id="categoryIdFromQuery" 
       :categories="categories"
     />
+    <io-edit
+      v-else-if="isIoType || (!isEdit && (tool?.data.type === 'mcpIo' || toolType === 'mcp-io'))"
+      :tool="tool || undefined"
+      :category-id="categoryIdFromQuery" 
+      :categories="categories"
+    />
     <div v-else class="tool-unsupported">
       <n-result
         status="warning"
@@ -36,7 +42,8 @@ import { useToolStore } from '../../stores/toolStore';
 import { useToolCategoryStore } from '../../stores/toolCategoryStore';
 import { Tool, ToolCategory } from '../../services/typings';
 import JsEdit from './js-edit.vue';
-import SseEdit from './sse-edit.vue';
+import SseEdit from './mcpsse-edit.vue';
+import IoEdit from './mcpio-edit.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -63,6 +70,13 @@ const isSseType = computed(() => {
     return toolType.value === 'mcp-sse';
   }
   return tool.value.data.type === 'mcpSse';
+});
+
+const isIoType = computed(() => {
+  if (!tool.value) {
+    return toolType.value === 'mcp-io';
+  }
+  return tool.value.data.type === 'mcpIo';
 });
 
 // 工具类型判断
@@ -101,7 +115,7 @@ async function loadToolData() {
       if (fetchedTool) {
         tool.value = fetchedTool;
         
-        if (!isJsType.value && !isSseType.value) {
+        if (!isJsType.value && !isSseType.value && !isIoType.value) {
           message.warning(`当前不支持编辑类型为 ${tool.value.data.type} 的工具`);
         }
       } else {

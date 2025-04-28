@@ -138,7 +138,7 @@ const setActive = (icon: string) => {
   // 如果正在测试中，阻止导航并显示提示
   if (globalStore.isLoading) {
     const { message } = createDiscreteApi(['message']);
-    message.warning('测试正在进行中，请等待测试完成后再进行操作');
+    message.warning('请等待任务完成后再进行操作');
     return;
   }
 

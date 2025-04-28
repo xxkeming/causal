@@ -441,7 +441,6 @@ async function deleteMessage(index: number) {
             messages.value.splice(index, 1);
           }
         }
-        message.success('消息已删除');
       }
     });
   } catch (error) {
@@ -471,7 +470,6 @@ async function clearSession() {
           await api.deleteMessagesBySession(currentSessionId.value as number);
           // 更新本地状态
           messages.value = [];
-          message.success('会话消息已清除');
         }
       });
     } catch (error) {
@@ -534,8 +532,6 @@ async function deleteSession(sessionId: number) {
     const success = await chatSessionStore.deleteSession(sessionId);
     
     if (success) {
-      message.success('会话已删除');
-      
       // 如果删除的是当前会话，则关闭当前会话
       if (isCurrentSession) {
         closeSession();
@@ -633,7 +629,6 @@ async function handleProviderSubmit(provider: Partial<Provider>) {
     };
     
     await providerStore.modifyProvider(updatedProvider);
-    message.success('更新提供商配置成功');
     providerConfigVisible.value = false;
     // 重新加载智能体信息以更新模型列表
     await loadAgentInfo();
@@ -656,7 +651,6 @@ async function handleAgentConfigSubmit(updatedAgent: Agent) {
     // 更改ChatSidebar组件的key，强制重新渲染
     forceUpdate.value += 1;
     
-    message.success('智能体配置已更新');
     agentConfigVisible.value = false;
   } catch (error) {
     console.error('更新智能体时出错:', error);

@@ -347,7 +347,7 @@ const createOptions: DropdownOption[] = [
     label: 'MCP-IO',
     key: 'mcp-io',
     icon: renderIcon(ExtensionPuzzleOutline),
-    disabled: true
+    disabled: false
   }
 ];
 

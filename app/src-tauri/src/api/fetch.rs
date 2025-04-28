@@ -1,5 +1,5 @@
 use crate::error;
-use crate::openai::tool::{McpSseTool, ToolObject};
+use crate::openai::tool::{McpTool, ToolObject};
 
 pub async fn ftech(
     store: tauri::State<'_, store::Store>, name: &str, data: &str,
@@ -24,14 +24,12 @@ pub async fn ftech(
         }
         "provider.get" => {
             let id: u64 = serde_json::from_str(data)?;
-            let provider = store.get_provider(id)?;
-            match provider {
-                Some(provider) => {
-                    let parsed_data: serde_json::Value = serde_json::to_value(provider)?;
-                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
-                }
-                None => Ok(serde_json::json!({ "status": "error", "error": "Provider not found" })),
-            }
+            let provider = store
+                .get_provider(id)?
+                .ok_or(error::Error::InvalidData("Provider not found".to_string()))?;
+
+            let parsed_data: serde_json::Value = serde_json::to_value(provider)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
         "provider.list" => {
             let list = store.get_all_providers()?;
@@ -70,14 +68,12 @@ pub async fn ftech(
         }
         "agent.get" => {
             let id: u64 = serde_json::from_str(data)?;
-            let agent = store.get_agent(id)?;
-            match agent {
-                Some(agent) => {
-                    let parsed_data: serde_json::Value = serde_json::to_value(agent)?;
-                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
-                }
-                None => Ok(serde_json::json!({ "status": "error", "error": "Agent not found" })),
-            }
+            let agent = store
+                .get_agent(id)?
+                .ok_or(error::Error::InvalidData("Agent not found".to_string()))?;
+
+            let parsed_data: serde_json::Value = serde_json::to_value(agent)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
         "agent.list" => {
             let list = store.get_all_agents()?;
@@ -91,16 +87,12 @@ pub async fn ftech(
         }
         "agent.category.get" => {
             let id: u64 = serde_json::from_str(data)?;
-            let category = store.get_agent_category(id)?;
-            match category {
-                Some(category) => {
-                    let parsed_data: serde_json::Value = serde_json::to_value(category)?;
-                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
-                }
-                None => Ok(
-                    serde_json::json!({ "status": "error", "error": "Agent category not found" }),
-                ),
-            }
+            let category = store
+                .get_agent_category(id)?
+                .ok_or(error::Error::InvalidData("Agent category not found".to_string()))?;
+
+            let parsed_data: serde_json::Value = serde_json::to_value(category)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
         "agent.category.add" => {
             let category: store::AgentCategory = serde_json::from_str(data)?;
@@ -139,14 +131,12 @@ pub async fn ftech(
         }
         "tool.get" => {
             let id: u64 = serde_json::from_str(data)?;
-            let tool = store.get_tool(id)?;
-            match tool {
-                Some(tool) => {
-                    let parsed_data: serde_json::Value = serde_json::to_value(tool)?;
-                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
-                }
-                None => Ok(serde_json::json!({ "status": "error", "error": "Tool not found" })),
-            }
+            let tool = store
+                .get_tool(id)?
+                .ok_or(error::Error::InvalidData("Tool not found".to_string()))?;
+
+            let parsed_data: serde_json::Value = serde_json::to_value(tool)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
         "tool.list" => {
             let list = store.get_all_tools()?;
@@ -160,16 +150,12 @@ pub async fn ftech(
         }
         "tool.category.get" => {
             let id: u64 = serde_json::from_str(data)?;
-            let category = store.get_tool_category(id)?;
-            match category {
-                Some(category) => {
-                    let parsed_data: serde_json::Value = serde_json::to_value(category)?;
-                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
-                }
-                None => {
-                    Ok(serde_json::json!({ "status": "error", "error": "Tool category not found" }))
-                }
-            }
+            let category = store
+                .get_tool_category(id)?
+                .ok_or(error::Error::InvalidData("Tool category not found".to_string()))?;
+
+            let parsed_data: serde_json::Value = serde_json::to_value(category)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
         "tool.category.add" => {
             let category: store::ToolCategory = serde_json::from_str(data)?;
@@ -188,12 +174,13 @@ pub async fn ftech(
         }
         "tool.mcp.sse.tools" => {
             let url: String = serde_json::from_str(data)?;
-            match McpSseTool::try_new(url).await {
-                Ok(tool) => {
-                    Ok(serde_json::json!({ "status": "success", "data": tool.description() }))
-                }
-                Err(e) => Ok(serde_json::json!({ "status": "error", "error": e.to_string() })),
-            }
+            let tool = McpTool::try_new_sse(url).await?;
+            Ok(serde_json::json!({ "status": "success", "data": tool.description() }))
+        }
+        "tool.mcp.io.tools" => {
+            let io: store::ToolMcpIo = serde_json::from_str(data)?;
+            let tool = McpTool::try_new_io(io.command, io.args, io.env).await?;
+            Ok(serde_json::json!({ "status": "success", "data": tool.description() }))
         }
         "chat.session.add" => {
             let session: store::ChatSession = serde_json::from_str(data)?;
@@ -212,16 +199,12 @@ pub async fn ftech(
         }
         "chat.session.get" => {
             let id: u64 = serde_json::from_str(data)?;
-            let session = store.get_chat_session(id)?;
-            match session {
-                Some(session) => {
-                    let parsed_data: serde_json::Value = serde_json::to_value(session)?;
-                    Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
-                }
-                None => {
-                    Ok(serde_json::json!({ "status": "error", "error": "Chat session not found" }))
-                }
-            }
+            let session = store
+                .get_chat_session(id)?
+                .ok_or(error::Error::InvalidData("Chat session not found".to_string()))?;
+
+            let parsed_data: serde_json::Value = serde_json::to_value(session)?;
+            Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
         "chat.session.list" => {
             let list = store.get_all_chat_sessions()?;
@@ -276,10 +259,7 @@ pub async fn ftech(
                 }
             }
 
-            return Ok(serde_json::json!({
-                "status": "error",
-                "message": "convert failed",
-            }));
+            return Err(error::Error::InvalidData("convert failed".to_string()));
         }
         _ => Err(error::Error::Unknown),
     }

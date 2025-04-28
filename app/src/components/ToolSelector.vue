@@ -65,10 +65,6 @@
                   <div class="tool-name">{{ tool.name }}</div>
                   <div class="tool-description">{{ tool.description }}</div>
                 </div>
-                <n-checkbox 
-                  :checked="isSelected(tool.id)" 
-                  @update:checked="(checked) => handleCheckboxChange(tool.id, checked)"
-                />
               </div>
             </n-grid-item>
           </n-grid>
@@ -97,7 +93,7 @@
 import { ref, computed, onMounted, h } from 'vue';
 import { 
   NInput, NIcon, NTabs, NTabPane, NEmpty, NScrollbar, 
-  NAvatar, NCheckbox, NSwitch, NGrid, NGridItem, NBadge 
+  NAvatar, NSwitch, NGrid, NGridItem, NBadge 
 } from 'naive-ui';
 import { SearchOutline, BuildOutline } from '@vicons/ionicons5';
 import { useToolStore } from '../stores/toolStore';
@@ -193,18 +189,6 @@ const toggleToolSelection = (tool: Tool) => {
   } else {
     newSelection.splice(index, 1);
   }
-  
-  emit('update:modelValue', newSelection);
-  emit('change', newSelection);
-};
-
-// 处理复选框状态变化
-const handleCheckboxChange = (toolId: number, checked: boolean) => {
-  if (props.disabled) return;
-  
-  const newSelection = checked
-    ? [...props.modelValue, toolId]
-    : props.modelValue.filter(id => id !== toolId);
   
   emit('update:modelValue', newSelection);
   emit('change', newSelection);

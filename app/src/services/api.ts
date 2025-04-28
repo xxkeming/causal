@@ -3,7 +3,8 @@ import { mockKnowledgeBases } from './mock/knowledgeData';
 import { KnowledgeBase, KnowledgeBaseCategory } from './typings';
 import { ChatSession, ChatMessage } from './typings';
 import { Provider } from './typings';
-import { Search } from './typings'
+import { Search } from './typings';
+import { ToolMcpIo } from './typings';
 
 // 导入Tauri API
 import * as tauriApi from './tauriApi';
@@ -167,6 +168,11 @@ export async function deleteToolByCategory(categoryId: number): Promise<boolean>
 // 获取mcp-sse所有工具 
 export async function getMcpSseTools(url: string): Promise<McpTool[]> {
   return tauriApi.fetch_local('tool.mcp.sse.tools', url) as Promise<McpTool[]>;
+}
+
+// 获取mcp-io所有工具 
+export async function getMcpIoTools(io: ToolMcpIo): Promise<McpTool[]> {
+  return tauriApi.fetch_local('tool.mcp.io.tools', io) as Promise<McpTool[]>;
 }
 
 // 测试工具

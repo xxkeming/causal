@@ -133,7 +133,7 @@ impl McpSseTool {
 
         client
             .initialize(
-                Implementation { name: "causal studio".to_string(), version: "1.0".to_string() },
+                Implementation { name: "causal ai".to_string(), version: "1.0.0".to_string() },
                 ClientCapabilities::default(),
             )
             .await

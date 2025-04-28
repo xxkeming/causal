@@ -7,7 +7,7 @@ use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 #[tauri::command]
 async fn app_name() -> String {
-    "Causal Studio".to_string()
+    "Causal AI".to_string()
 }
 
 #[tauri::command]
@@ -24,7 +24,10 @@ async fn app_date() -> String {
 async fn fetch(
     store: tauri::State<'_, store::Store>, name: String, data: String,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::fetch::ftech(store, &name, &data).await.map_err(|e| e.into())
+    api::fetch::ftech(store, &name, &data).await.map_err(|e| {
+        tracing::error!("fetch error: {}", e.to_string());
+        e.into()
+    })
 }
 
 #[tauri::command]
@@ -35,7 +38,10 @@ async fn event(
 ) -> Result<serde_json::Value, serde_json::Value> {
     api::event::event(tasks, store, agent, session, message, search, time, stream, on_event)
         .await
-        .map_err(|e| e.into())
+        .map_err(|e| {
+            tracing::error!("event error: {}", e.to_string());
+            e.into()
+        })
 }
 
 #[tauri::command]
@@ -65,11 +71,9 @@ pub async fn run() {
 
     // tracing日志
     tracing_subscriber::fmt()
-        // .with_writer(std::fs::File::create(format!("{}/run.log", causal_dir)).unwrap())
+        .with_writer(std::fs::File::create(format!("{}/run.log", causal_dir)).unwrap())
         .with_max_level(tracing::Level::INFO)
         .init();
-
-    tracing::info!("Version from cargo.toml: {}", env!("CARGO_PKG_NAME"));
 
     // 打开数据库
     let store = store::Store::open(format!("{}/store", causal_dir)).unwrap();

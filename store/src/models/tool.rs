@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bonsaidb::core::schema::Collection;
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +33,7 @@ pub struct McpTool {
 pub struct ToolJavaScript {
     /// 参数
     pub param: Option<Vec<Param>>,
+
     /// JS代码
     pub code: String,
 }
@@ -38,11 +41,14 @@ pub struct ToolJavaScript {
 /// MCP-IO工具数据
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ToolMcpIo {
-    /// 路径
-    pub path: String,
+    /// 命令
+    pub command: String,
 
-    /// tools
-    pub tools: Vec<McpTool>,
+    // 参数
+    pub args: Option<Vec<String>>,
+
+    // 环境变量
+    pub env: Option<HashMap<String, String>>,
 }
 
 /// MCP-SSE工具数据
@@ -50,9 +56,6 @@ pub struct ToolMcpIo {
 pub struct ToolMcpSse {
     /// URL
     pub url: String,
-
-    /// tools
-    pub tools: Vec<McpTool>,
 }
 
 /// 工具数据（可能是JS脚本、MCP-IO或MCP-SSE）
@@ -122,14 +125,6 @@ impl Tool {
     pub fn code(&self) -> Option<&str> {
         match &self.data {
             ToolData::JavsScript(script) => Some(&script.code),
-            _ => None,
-        }
-    }
-
-    // 获取路径（如果是MCP-IO工具）
-    pub fn path(&self) -> Option<&str> {
-        match &self.data {
-            ToolData::McpIo(mcp_io) => Some(&mcp_io.path),
             _ => None,
         }
     }

@@ -3,5 +3,5 @@
 
 #[tokio::main]
 async fn main() {
-    causal_studio_lib::run().await;
+    causal_lib::run().await;
 }

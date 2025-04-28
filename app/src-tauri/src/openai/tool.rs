@@ -7,7 +7,7 @@ mod search;
 use search::SearchTaivlyTool;
 
 mod mcp;
-pub use mcp::McpSseTool;
+pub use mcp::McpTool;
 
 use crate::error;
 
@@ -55,11 +55,15 @@ impl Tool {
     }
 
     pub async fn into_tool_object(self) -> Result<Box<dyn ToolObject>, error::Error> {
-        if let store::ToolData::McpSse(ref sse) = self.0.data {
-            // MCP-SSE工具
-            return Ok(Box::new(McpSseTool::try_new(sse.url.clone()).await?));
+        match self.0.data {
+            store::ToolData::McpSse(sse) => {
+                return Ok(Box::new(McpTool::try_new_sse(sse.url).await?));
+            }
+            store::ToolData::McpIo(io) => {
+                return Ok(Box::new(McpTool::try_new_io(io.command, io.args, io.env).await?));
+            }
+            _ => Err(error::Error::InvalidData("Unsupported tool type".to_string())),
         }
-        Err(error::Error::InvalidData("Unsupported tool type".to_string()))
     }
 }
 

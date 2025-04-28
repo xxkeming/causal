@@ -61,7 +61,7 @@
           </div>
         </template>
         <div class="api-input-wrapper">
-          <n-input v-model:value="formData.url" placeholder="请输入 API 地址" />
+          <n-input v-model:value="formData.url" placeholder="请输入 API 地址" :spellcheck="false" :autocomplete="false"/>
           <!-- 将预览放在输入框的容器里，而不是直接放在表单项内 -->
           <div class="api-path-preview" v-if="formData.url">
             <span class="api-path-value">{{ completionApiPath }}</span>
@@ -95,6 +95,8 @@
                 class="model-name-input"
                 :status="!model.name && submitAttempted ? 'error' : undefined"
                 required
+                :spellcheck="false"
+                :autocomplete="false"
               />
               
               <n-select

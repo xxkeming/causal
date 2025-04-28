@@ -34,9 +34,9 @@
           <div class="code-editor-main">
             <div class="tool-list">
               <n-spin :show="globalStore.isLoading">
-                <n-empty v-if="!toolForm.data.tools?.length" description="暂无工具" />
+                <n-empty v-if="!toolList.length" description="暂无工具" />
                 <n-list v-else>
-                  <n-list-item v-for="tool in toolForm.data.tools" :key="tool.name">
+                  <n-list-item v-for="tool in toolList" :key="tool.name">
                     <n-space align="center" justify="space-between">
                       <div class="tool-info">
                         <div class="tool-name">{{ tool.name }}</div>
@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NForm, NFormItem, NInput, NButton, NIcon, NSelect, NSpace, NEmpty, NSpin, NList, NListItem } from 'naive-ui';
 import { CloseOutline, SaveOutline, PlayOutline } from '@vicons/ionicons5';
@@ -122,7 +122,7 @@ import { useToolStore } from '../../stores/toolStore';
 import { useGlobalStore } from '../../stores/globalStore';
 import { useMessage } from 'naive-ui';
 import AvatarSelector from '../../components/AvatarSelector.vue';
-import type { Tool, ToolCategory, ToolMcpSse } from '../../services/typings';
+import type { Tool, ToolCategory, ToolMcpSse, McpTool } from '../../services/typings';
 import { getMcpSseTools } from '../../services/api';
 
 // Props 类型定义
@@ -144,13 +144,14 @@ const isEdit = computed(() => !!route.params.id);
 const toolId = computed(() => Number(route.params.id));
 
 const formRef = ref(null);
+const toolList = ref<McpTool[]>([]);
 
 // 表单数据类型定义
 interface FormState {
   id: number;
   name: string;
   description: string;
-  categoryId: number;
+  categoryId?: number;
   iconId?: number;
   data: ToolMcpSse;
 }
@@ -160,17 +161,13 @@ const toolForm = reactive<FormState>({
   id: 0,
   name: '',
   description: '',
-  categoryId: 0, // 设置默认值为 0
+  categoryId: undefined, // 设置默认值为 0
   iconId: undefined,
   data: {
     type: 'mcpSse',
-    url: '',
-    tools: []
+    url: ''
   }
 });
-
-// 工具列表状态
-const toolsLoading = ref(false);
 
 // 分类选项
 const categoryOptions = computed(() => {
@@ -200,20 +197,6 @@ const formRules = {
   }
 };
 
-// 获取MCP工具列表
-async function fetchMcpTools() {
-  toolsLoading.value = true;
-  try {
-    const data = await getMcpSseTools(toolForm.data.url);
-    toolForm.data.tools = data;
-  } catch (error) {
-    console.error('Failed to fetch MCP tools:', error);
-    message.error('获取工具列表失败');
-  } finally {
-    toolsLoading.value = false;
-  }
-}
-
 // 添加测试状态
 const testPassed = ref(false);
 
@@ -227,23 +210,17 @@ async function testUrl() {
   globalStore.setLoadingState(true);
   try {
     const data = await getMcpSseTools(toolForm.data.url);
-    toolForm.data.tools = data;
+    toolList.value = data;
     testPassed.value = true;
   } catch (error) {
     console.error('URL测试失败:', error);
     message.error('URL测试失败');
     testPassed.value = false;
-    toolForm.data.tools = [];
+    toolList.value = [];
   } finally {
     globalStore.setLoadingState(false);
   }
 }
-
-// 重置测试状态当URL变化时
-watch(() => toolForm.data.url, () => {
-  testPassed.value = false;
-  toolForm.data.tools = [];
-});
 
 // 保存工具前，手动验证参数
 async function saveTool() {
@@ -279,6 +256,7 @@ async function saveTool() {
 
       await toolStore.modifyTool({
         ...toolForm,
+        categoryId: toolForm.categoryId as number, // Ensure categoryId is a number
         createdAt: props.tool?.createdAt || Date.now(), // 添加必需的 createdAt
         updatedAt: Date.now()
       });
@@ -291,8 +269,7 @@ async function saveTool() {
         iconId: toolForm.iconId,
         data: {
           type: 'mcpSse',
-          url: toolForm.data.url,
-          tools: toolForm.data.tools
+          url: toolForm.data.url
         }
       };
       await toolStore.createTool(submitData);
@@ -315,15 +292,6 @@ async function saveTool() {
 function goBack() {
   router.push('/tools');
 }
-
-// 监听 URL 变化自动获取工具列表
-watch(() => toolForm.data.url, (newUrl) => {
-  if (newUrl && toolForm.data.url !== newUrl) {
-    fetchMcpTools();
-  } else {
-    toolForm.data.tools = [];
-  }
-});
 
 // 加载工具数据
 async function loadToolData() {
@@ -439,14 +407,6 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-}
-
-.params-list {
-  margin-top: 16px;
-}
-
-.param-form {
-  padding: 8px;
 }
 
 .code-editor-container {

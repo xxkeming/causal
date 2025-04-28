@@ -143,14 +143,17 @@ export interface ToolJavaScript {
 // mcp-io
 export interface ToolMcpIo {
   type: 'mcpIo'
-  path: string;
+  command: string;
+  args?: string[];
+  env?: {
+    [key: string]: string;
+  };
 }
 
 // mcp-sse
 export interface ToolMcpSse {
   type: 'mcpSse';
   url: string;
-  tools: McpTool[];
 }
 
 // 工具

@@ -306,17 +306,17 @@ mod tests {
             description: "工具2描述".to_string(),
             data: ToolData::McpSse(ToolMcpSse {
                 url: "http://example.com".to_string(),
-                tools: vec![McpTool {
-                    name: "工具2".to_string(),
-                    description: "工具2描述".to_string(),
-                    input_schema: serde_json::json!({
-                        "type": "object",
-                        "properties": {
-                            "param1": { "type": "string" },
-                            "param2": { "type": "number" }
-                        }
-                    }),
-                }],
+                // tools: vec![McpTool {
+                //     name: "工具2".to_string(),
+                //     description: "工具2描述".to_string(),
+                //     input_schema: serde_json::json!({
+                //         "type": "object",
+                //         "properties": {
+                //             "param1": { "type": "string" },
+                //             "param2": { "type": "number" }
+                //         }
+                //     }),
+                // }],
             }),
             created_at: Utc::now().timestamp(),
             updated_at: None,
@@ -370,17 +370,17 @@ mod tests {
             description: "工具2描述".to_string(),
             data: ToolData::McpSse(ToolMcpSse {
                 url: "http://example.com".to_string(),
-                tools: vec![McpTool {
-                    name: "工具2".to_string(),
-                    description: "工具2描述".to_string(),
-                    input_schema: serde_json::json!({
-                        "type": "object",
-                        "properties": {
-                            "param1": { "type": "string" },
-                            "param2": { "type": "number" }
-                        }
-                    }),
-                }],
+                // tools: vec![McpTool {
+                //     name: "工具2".to_string(),
+                //     description: "工具2描述".to_string(),
+                //     input_schema: serde_json::json!({
+                //         "type": "object",
+                //         "properties": {
+                //             "param1": { "type": "string" },
+                //             "param2": { "type": "number" }
+                //         }
+                //     }),
+                // }],
             }),
             created_at: Utc::now().timestamp(),
             updated_at: None,

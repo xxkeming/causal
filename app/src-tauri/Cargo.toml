@@ -1,5 +1,5 @@
 [package]
-name = "causal-studio"
+name = "causal"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,7 +10,7 @@ authors.workspace = true
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "causal_studio_lib"
+name = "causal_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -26,7 +26,13 @@ futures = "*"
 
 async-openai = { workspace = true }
 tavily = "2.0.3"
-mcp-core = { version = "0.1.43", features = ["sse"] }
+
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = [
+    "client",
+    "transport-sse",
+    "transport-child-process",
+    "tower",
+] }
 
 time = "0.3.41"
 

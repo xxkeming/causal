@@ -25,3 +25,6 @@ async-openai = "0.28.1"
 store = { path = "./store" }
 # tools = { path = "./tools" }
 document = { path = "./document" }
+
+[patch.crates-io]
+sse-stream = { path = "../ai-test/sse-stream", version = "=0.1.3" }

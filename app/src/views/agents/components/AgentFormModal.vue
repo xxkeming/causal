@@ -351,6 +351,8 @@
                     type="text"
                     placeholder="输入常用问题" 
                     class="question-input"
+                    :spellcheck="false"
+                    :autocomplete="false"
                   />
                   
                   <n-button
@@ -378,6 +380,8 @@
                     type="text"
                     placeholder="添加新的常用问题" 
                     class="question-input"
+                    :spellcheck="false"
+                    :autocomplete="false"
                     @keyup.enter="addQuestion"
                   />
                   
@@ -425,6 +429,8 @@
                     v-model:value="param.name" 
                     placeholder="参数名称" 
                     class="param-name-input" 
+                    :spellcheck="false"
+                    :autocomplete="false"
                   />
                   
                   <n-select
@@ -437,6 +443,8 @@
                   <n-input 
                     v-model:value="param.value" 
                     placeholder="参数值" 
+                    :spellcheck="false"
+                    :autocomplete="false"
                     class="param-value-input"
                     :type="param.type === 'number' ? 'text' : 'text'"
                   />
@@ -464,6 +472,8 @@
                   <n-input 
                     v-model:value="newParam.name" 
                     placeholder="参数名称" 
+                    :spellcheck="false"
+                    :autocomplete="false"
                     class="param-name-input" 
                   />
                   
@@ -477,6 +487,8 @@
                   <n-input 
                     v-model:value="newParam.value" 
                     placeholder="参数值" 
+                    :spellcheck="false"
+                    :autocomplete="false"
                     class="param-value-input"
                     :type="newParam.type === 'number' ? 'text' : 'text'"
                   />
