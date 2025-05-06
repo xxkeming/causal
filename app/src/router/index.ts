@@ -11,16 +11,6 @@ const routes = [
         redirect: '/chat'
       },
       {
-        path: 'profile',
-        name: 'profile',
-        component: () => import('../views/profile/index.vue')
-      },
-      {
-        path: 'messages',
-        name: 'messages',
-        component: () => import('../views/messages/index.vue')
-      },
-      {
         path: 'agents',
         name: 'agents',
         component: () => import('../views/agents/index.vue')

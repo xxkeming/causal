@@ -165,7 +165,7 @@ const filteredTools = computed(() => {
   if (keyword) {
     result = result.filter(tool => 
       tool.name.toLowerCase().includes(keyword) || 
-      tool.description.toLowerCase().includes(keyword)
+      tool.description?.toLowerCase().includes(keyword)
     );
   }
   

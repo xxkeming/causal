@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { useGlobalStore } from './globalStore';
 import { KnowledgeBaseCategory } from '../services/typings';
 
 export const useKnowledgeBaseCategoryStore = defineStore('knowledgeBaseCategory', () => {
-  const globalStore = useGlobalStore();
   const categories: KnowledgeBaseCategory[] = [
     {
       id: "1",
@@ -19,7 +17,6 @@ export const useKnowledgeBaseCategoryStore = defineStore('knowledgeBaseCategory'
   
   return {
     categories,
-    loading: globalStore.isLoading,
     error
   };
 });

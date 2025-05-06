@@ -32,7 +32,7 @@
         </n-button>
       </div>
   
-      <n-spin :show="knowledgeStore.loading || categoryStore.loading">
+      <n-spin :show="globalStore.isLoading">
         <div class="knowledge-cards">
           <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
             <n-grid-item v-for="kb in filteredKnowledgeBases" :key="kb.id">
@@ -97,7 +97,7 @@
           </n-grid>
 
           <!-- 空状态 -->
-          <div v-if="filteredKnowledgeBases.length === 0 && !knowledgeStore.loading" class="empty-state-container">
+          <div v-if="filteredKnowledgeBases.length === 0 && !globalStore.isLoading" class="empty-state-container">
             <n-empty :description="emptyDescription" />
           </div>
         </div>
@@ -146,10 +146,11 @@ import { KnowledgeBase } from '../../services/typings';
 import { useKnowledgeBaseStore } from '../../stores/knowledgeBaseStore';
 import { useKnowledgeBaseCategoryStore } from '../../stores/knowledgeBaseCategoryStore';
 import { useIconStore } from '../../stores/iconStore';
-
+import { useGlobalStore } from '../../stores/globalStore';
 const message = useMessage();
 
 // Store
+const globalStore = useGlobalStore();
 const knowledgeStore = useKnowledgeBaseStore();
 const categoryStore = useKnowledgeBaseCategoryStore();
 const iconStore = useIconStore();
@@ -261,6 +262,7 @@ async function deleteKnowledgeBase() {
   if (!knowledgeBaseToDelete.value) return;
   
   try {
+    globalStore.setLoadingState(true);
     const success = await knowledgeStore.removeKnowledgeBase(knowledgeBaseToDelete.value.id);
     if (success) {
       message.success('知识库已删除');
@@ -272,6 +274,7 @@ async function deleteKnowledgeBase() {
   } finally {
     showDeleteModal.value = false;
     knowledgeBaseToDelete.value = null;
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -279,7 +282,14 @@ async function deleteKnowledgeBase() {
 watch(() => knowledgeStore.needRefresh, (needRefresh) => {
   if (needRefresh) {
     console.log("需要刷新知识库列表，正在重新加载...");
-    knowledgeStore.fetchAllKnowledgeBases();
+    try {
+      globalStore.setLoadingState(true);
+      knowledgeStore.fetchAllKnowledgeBases();
+    } catch (error) {
+      message.error('加载知识库时发生错误');
+    } finally {
+      globalStore.setLoadingState(false);
+    }
   }
 }, { immediate: true }); 
 
@@ -288,7 +298,14 @@ onMounted(async () => {
   console.log('Knowledge view mounted');
   
   // 加载所有知识库数据
-  knowledgeStore.fetchAllKnowledgeBases();
+  try {
+    globalStore.setLoadingState(true);
+    knowledgeStore.fetchAllKnowledgeBases();
+  } catch (error) {
+    message.error('加载知识库时发生错误');
+  } finally {
+    globalStore.setLoadingState(false);
+  }
 });
 </script>
 

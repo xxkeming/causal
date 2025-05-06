@@ -87,7 +87,7 @@
                   />
                 </n-form-item>
 
-                <n-form-item label="描述" path="description" :required="true">
+                <n-form-item label="描述" path="description">
                   <n-input
                     v-model:value="toolForm.description"
                     type="textarea"
@@ -186,10 +186,6 @@ const formRules = {
   categoryId: {
     required: true,
     message: '请选择分类'
-  },
-  description: {
-    required: true,
-    message: '请输入描述'
   },
   'data.url': {
     required: true,

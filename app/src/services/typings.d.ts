@@ -165,7 +165,7 @@ export interface Tool {
   iconId?: number;
 
   name: string;
-  description: string;
+  description?: string;
 
   // 工具类型
   data: ToolJavaScript | ToolMcpIo | ToolMcpSse;

@@ -337,9 +337,23 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
           // 通过API更新最终状态
           await api.updateMessage(messages.value[assistantIndex]);
           break;
-        case 'chat':
+        case 'reasoningContent':
           // 处理流式输出
           // 更新助手消息的状态和内容
+          // 提取messages里面的内容 <think></think>
+          if (messages.value[assistantIndex].status === 'reasoning') {
+            messages.value[assistantIndex].content = '<think>' + messages.value[assistantIndex].content + event.data.content;
+          } else {
+            messages.value[assistantIndex].content = messages.value[assistantIndex].content + event.data.content;
+          }
+          messages.value[assistantIndex].status = 'reasoning';
+          break;
+        case 'content':
+          // 处理流式输出
+          // 更新助手消息的状态和内容
+          if (messages.value[assistantIndex].status === 'reasoning') {
+            messages.value[assistantIndex].content = messages.value[assistantIndex].content + '</think>';
+          }
           messages.value[assistantIndex].content = messages.value[assistantIndex].content + event.data.content;
           messages.value[assistantIndex].status = 'processing';
           break;

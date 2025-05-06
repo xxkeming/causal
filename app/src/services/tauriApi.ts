@@ -35,8 +35,15 @@ export type  MessageEvent =
 | {
     event: 'started';
   }
+|
+  {
+    event: 'reasoningContent';
+    data: {
+      content: string;
+    };
+  }
 | {
-    event: 'chat';
+    event: 'content';
     data: {
       content: string;
     };

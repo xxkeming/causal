@@ -139,33 +139,34 @@ function selectAgent(agent: Agent) {
 
 .agents-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 减小最小宽度 */
+  gap: 16px; /* 减少间距 */
   width: 100%;
   max-width: 1200px;
 }
 
 .agent-card {
   display: flex;
-  padding: 16px;
-  border-radius: 10px;
+  padding: 12px; /* 减少内边距 */
+  border-radius: 8px; /* 减小圆角 */
   border: 1px solid var(--border-color);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   background-color: var(--card-color);
+  min-height: unset; /* 移除最小高度限制 */
+  align-items: center; /* 垂直居中内容 */
 }
 
 .agent-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-  border-color: var(--primary-color-hover);
-  background-color: rgba(24, 160, 88, 0.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  background-color: rgba(24, 160, 88, 0.02);
 }
 
 /* 添加点击效果 */
 .agent-card:active {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .create-agent-card {
@@ -173,26 +174,27 @@ function selectAgent(agent: Agent) {
 }
 
 .agent-card-avatar {
-  margin-right: 16px;
+  margin-right: 12px; /* 减少间距 */
+  flex-shrink: 0;
 }
 
 .agent-card-content {
   flex: 1;
   min-width: 0;
+  display: flex; 
+  flex-direction: column;
 }
 
 .agent-card-name {
-  font-weight: 600;
-  font-size: 16px;
-  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 14px; /* 减小字体 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 隐藏描述 */
 .agent-card-description {
-  font-size: 14px;
-  color: var(--text-color-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: none;
 }
 </style>

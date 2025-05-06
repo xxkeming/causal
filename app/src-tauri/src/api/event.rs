@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_openai::{
+    Client,
     config::OpenAIConfig,
     types::{
         ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
@@ -8,14 +9,13 @@ use async_openai::{
         ChatCompletionRequestToolMessageArgs, ChatCompletionToolType, CompletionUsage,
         CreateChatCompletionRequest, CreateChatCompletionRequestArgs, FinishReason, FunctionCall,
     },
-    Client,
 };
 
 use futures::StreamExt;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::{
-    sync::{Mutex, RwLock},
+    sync::{Mutex, RwLock, mpsc, watch},
     task::JoinSet,
 };
 
@@ -35,7 +35,10 @@ pub type MessageTasks = Arc<RwLock<HashMap<u64, MessageTask>>>;
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 pub enum MessageEvent {
     Started,
-    Chat {
+    ReasoningContent {
+        content: String,
+    },
+    Content {
         content: String,
     },
     Tool {
@@ -76,11 +79,11 @@ async fn call_tools(
 async fn event_chat_stream(
     client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Box<dyn ToolObject>>>,
     request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
-    on_event: &tauri::ipc::Channel<MessageEvent>,
+    on_event: &mpsc::Sender<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
     // let prompt = messages.pop().unwrap();
 
-    // println!("messages: {:?}", messages);
+    // tracing::info!("messages: {:?}", messages);
 
     let mut stream = client.chat().create_stream(request).await?;
 
@@ -91,9 +94,11 @@ async fn event_chat_stream(
 
     while let Some(result) = stream.next().await {
         let response = result?;
-        // println!("response: {:?}", response.usage);
+        // tracing::info!("response: {:?}", response.usage);
 
         for chat_choice in response.choices {
+            // tracing::info!("reasoning_content: {:?}", chat_choice.delta.reasoning_content);
+
             if let Some(tool_calls) = chat_choice.delta.tool_calls {
                 for tool_call_chunk in tool_calls.into_iter() {
                     let key = (chat_choice.index, tool_call_chunk.index);
@@ -122,7 +127,7 @@ async fn event_chat_stream(
             }
 
             if let Some(finish_reason) = &chat_choice.finish_reason {
-                // println!("finish_reason: {:?} {:?}", finish_reason, tool_call_states);
+                // tracing::info!("finish_reason: {:?} {:?}", finish_reason, tool_call_states);
 
                 if matches!(finish_reason, FinishReason::Stop) {
                     return Ok((false, response.usage));
@@ -161,7 +166,8 @@ async fn event_chat_stream(
                                 arguments: tc.0.function.arguments.clone(),
                                 result: tc.1.to_string(),
                             })
-                            .map_err(|_| error::Error::Unknown)?;
+                            .await
+                            .map_err(|e| error::Error::InvalidData(e.to_string()))?;
                     }
 
                     let assistant_messages: ChatCompletionRequestMessage =
@@ -183,8 +189,18 @@ async fn event_chat_stream(
                 }
             }
 
-            if let Some(content) = chat_choice.delta.content {
-                on_event.send(MessageEvent::Chat { content }).map_err(|_| error::Error::Unknown)?;
+            if let Some(content) = chat_choice.delta.reasoning_content.filter(|v| v.len() > 0) {
+                on_event
+                    .send(MessageEvent::ReasoningContent { content })
+                    .await
+                    .map_err(|e| error::Error::InvalidData(e.to_string()))?;
+            }
+
+            if let Some(content) = chat_choice.delta.content.filter(|v| v.len() > 0) {
+                on_event
+                    .send(MessageEvent::Content { content })
+                    .await
+                    .map_err(|e| error::Error::InvalidData(e.to_string()))?;
             }
         }
     }
@@ -195,13 +211,13 @@ async fn event_chat_stream(
 async fn event_chat(
     client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Box<dyn ToolObject>>>,
     request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
-    on_event: &tauri::ipc::Channel<MessageEvent>,
+    on_event: &mpsc::Sender<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
-    // println!("messages: {:?}", messages);
+    // tracing::info!("messages: {:?}", messages);
 
     let response = client.chat().create(request).await?;
 
-    // println!("response: {:?}", response.usage);
+    // tracing::info!("response: {:?}", response.usage);
 
     for choice in response.choices {
         if let Some(tool_calls) = choice.message.tool_calls {
@@ -247,8 +263,18 @@ async fn event_chat(
             return Ok((true, response.usage));
         }
 
+        if let Some(content) = choice.message.reasoning_content {
+            on_event
+                .send(MessageEvent::ReasoningContent { content })
+                .await
+                .map_err(|e| error::Error::InvalidData(e.to_string()))?;
+        }
+
         if let Some(content) = choice.message.content {
-            on_event.send(MessageEvent::Chat { content }).map_err(|_| error::Error::Unknown)?;
+            on_event
+                .send(MessageEvent::Content { content })
+                .await
+                .map_err(|e| error::Error::InvalidData(e.to_string()))?;
         }
     }
 
@@ -273,16 +299,16 @@ pub async fn event(
         return Err(error::Error::InvalidData(format!("Provider with {:?} not found", model)));
     };
 
-    // println!("Provider: {:?}", provider);
+    // tracing::info!("Provider: {:?}", provider);
 
     let mut contexts = store.get_messages_by_session_and_message(
         session_id,
         message_id - 1,
         agent.context_size as usize * 2 + 1,
     )?;
-    for context in contexts.iter() {
-        tracing::info!("Message: {:?}", context.content);
-    }
+    // for context in contexts.iter() {
+    //     tracing::info!("Message: {:?}", context.content);
+    // }
 
     let Some(context) = contexts.pop() else {
         return Err(error::Error::InvalidData(format!(
@@ -355,10 +381,12 @@ pub async fn event(
     }
     let tool_objects = Arc::new(tool_objects);
 
-    let mut messages = vec![ChatCompletionRequestSystemMessageArgs::default()
-        .content(agent.prompt.clone())
-        .build()?
-        .into()];
+    let mut messages = vec![
+        ChatCompletionRequestSystemMessageArgs::default()
+            .content(agent.prompt.clone())
+            .build()?
+            .into(),
+    ];
 
     for context in contexts.into_iter() {
         messages.push(chat::Message::new(context, agent.context_extend).try_into()?);
@@ -370,8 +398,19 @@ pub async fn event(
     let mut usages = Vec::new();
     let cost = std::time::Instant::now();
 
-    let (tx, mut rx) = tokio::sync::watch::channel(());
-    tasks.write().await.insert(message_id, MessageTask { exit: tx });
+    let (sender_exit, mut receiver_exit) = watch::channel(());
+    tasks.write().await.insert(message_id, MessageTask { exit: sender_exit });
+
+    let (sender_event, mut receiver_event) = mpsc::channel::<MessageEvent>(32);
+    tokio::spawn(async move {
+        while let Some(event) = receiver_event.recv().await {
+            tracing::info!("Event: {:?}", event);
+            if let Err(e) = on_event.send(event) {
+                tracing::error!("Error sending event: {:?}", e);
+            }
+        }
+        tracing::info!("Event task {} exit", message_id);
+    });
 
     loop {
         let task = async {
@@ -391,16 +430,23 @@ pub async fn event(
             }
 
             let (is_continue, usage) = if stream {
-                event_chat_stream(&client, tool_objects.clone(), request, &mut messages, &on_event)
-                    .await?
+                event_chat_stream(
+                    &client,
+                    tool_objects.clone(),
+                    request,
+                    &mut messages,
+                    &sender_event,
+                )
+                .await?
             } else {
-                event_chat(&client, tool_objects.clone(), request, &mut messages, &on_event).await?
+                event_chat(&client, tool_objects.clone(), request, &mut messages, &sender_event)
+                    .await?
             };
             Ok::<_, error::Error>((is_continue, usage))
         };
 
         let (is_continue, usage) = tokio::select! {
-            _ = rx.changed() => {
+            _ = receiver_exit.changed() => {
                 tracing::info!("Message task {} exit", message_id);
                 (false, None)
             }
@@ -441,7 +487,7 @@ pub async fn event(
     };
     tracing::info!("Finished: {:?}", finised);
 
-    on_event.send(finised).map_err(|_| error::Error::Unknown)?;
+    sender_event.send(finised).await.map_err(|_| error::Error::Unknown)?;
 
     Ok(serde_json::json!({
         "status": "success"

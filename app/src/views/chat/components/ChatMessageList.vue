@@ -402,13 +402,15 @@ function copyMessage(message: ChatMessage) {
   gap: 20px;
   height: 100vh;
   scroll-behavior: smooth;
+  align-items: center;
 }
 
 /* 消息项样式 */
 .message-item {
   display: flex;
   gap: 12px;
-  align-self: flex-start;
+  align-self: center;
+  max-width: 850px;
   width: 100%;
   padding-bottom: 8px;
   border-bottom: 1px solid #e5e7eb;

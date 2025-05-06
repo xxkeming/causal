@@ -151,7 +151,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{McpTool, Param, ToolData, ToolJavaScript, ToolMcpSse};
+    use crate::models::{Param, ToolData, ToolJavaScript, ToolMcpSse};
     use chrono::Utc;
     use tempfile::tempdir;
 
@@ -218,7 +218,7 @@ mod tests {
             category_id: 1,
             icon_id: Some(10),
             name: "测试工具".to_string(),
-            description: "这是一个测试工具".to_string(),
+            description: Some("这是一个测试工具".to_string()),
             data: ToolData::JavsScript(ToolJavaScript {
                 param: Some(vec![Param {
                     name: "param1".to_string(),
@@ -289,7 +289,7 @@ mod tests {
             category_id: 1,
             icon_id: None,
             name: "工具1".to_string(),
-            description: "工具1描述".to_string(),
+            description: Some("工具1描述".to_string()),
             data: ToolData::JavsScript(ToolJavaScript {
                 param: None,
                 code: "function test() {}".to_string(),
@@ -303,7 +303,7 @@ mod tests {
             category_id: 1,
             icon_id: None,
             name: "工具2".to_string(),
-            description: "工具2描述".to_string(),
+            description: Some("工具2描述".to_string()),
             data: ToolData::McpSse(ToolMcpSse {
                 url: "http://example.com".to_string(),
                 // tools: vec![McpTool {
@@ -327,7 +327,7 @@ mod tests {
             category_id: 2,
             icon_id: None,
             name: "工具3".to_string(),
-            description: "工具3描述".to_string(),
+            description: Some("工具3描述".to_string()),
             data: ToolData::JavsScript(ToolJavaScript {
                 param: None,
                 code: "function test() {}".to_string(),
@@ -367,7 +367,7 @@ mod tests {
             category_id: 1,
             icon_id: None,
             name: "工具2".to_string(),
-            description: "工具2描述".to_string(),
+            description: Some("工具2描述".to_string()),
             data: ToolData::McpSse(ToolMcpSse {
                 url: "http://example.com".to_string(),
                 // tools: vec![McpTool {

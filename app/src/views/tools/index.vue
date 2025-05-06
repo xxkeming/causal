@@ -108,18 +108,11 @@
           </n-dropdown>
         </div>
     
-        <n-spin :show="toolStore.loading || categoryStore.loading">
+        <n-spin :show="globalStore.isLoading">
           <div class="tools-cards">
             <n-grid :cols="4" :x-gap="16" :y-gap="16" responsive="screen">
               <n-grid-item v-for="tool in filteredTools" :key="tool.id">
                 <n-card hoverable class="tool-card" :bordered="false">
-                  <!-- 添加工具类型标签 -->
-                  <div class="tool-type-tag">
-                    <n-tag size="small" :type="getTypeTagColor(tool.data.type)">
-                      {{ getTypeDisplay(tool.data.type) }}
-                    </n-tag>
-                  </div>
-                  
                   <template #header>
                     <div class="tool-card-header">
                       <n-avatar round :size="32" :color="getToolIcon(tool)?.color || '#d9d9d9'">
@@ -129,12 +122,14 @@
                         <n-icon size="24" v-else><BuildOutline /></n-icon>
                       </n-avatar>
                       <div class="tool-card-title">{{ tool.name }}</div>
+                      <!-- 添加工具类型标签 -->
+                      <div class="tool-type-tag">
+                        <n-tag size="small" :type="getTypeTagColor(tool.data.type)">
+                          {{ getTypeDisplay(tool.data.type) }}
+                        </n-tag>
+                      </div>
                     </div>
                   </template>
-              
-                  <div class="tool-card-description">
-                    {{ tool.description }}
-                  </div>
               
                   <template #footer>
                     <div class="tool-card-footer">
@@ -165,7 +160,7 @@
             </n-grid>
 
             <!-- 空状态 -->
-            <div v-if="filteredTools.length === 0 && !toolStore.loading" class="empty-state-container">
+            <div v-if="filteredTools.length === 0 && !globalStore.isLoading" class="empty-state-container">
               <n-empty :description="emptyDescription" />
             </div>
           </div>
@@ -198,6 +193,7 @@ import {
 } from '@vicons/ionicons5';
 import { useMessage } from 'naive-ui';
 import { ToolCategory, Tool } from '../../services/typings';
+import { useGlobalStore } from '../../stores/globalStore';
 import { useToolStore } from '../../stores/toolStore';
 import { useToolCategoryStore } from '../../stores/toolCategoryStore';
 import { useIconStore } from '../../stores/iconStore';
@@ -210,6 +206,7 @@ const message = useMessage();
 const dialog = useDialog(); // 添加 dialog
 
 // Store
+const globalStore = useGlobalStore();
 const toolStore = useToolStore();
 const categoryStore = useToolCategoryStore();
 const iconStore = useIconStore();
@@ -269,6 +266,8 @@ function formatDate(dateString: string): string {
 // 修改确认删除分类函数
 async function confirmDeleteCategory(category: ToolCategory) {
   try {
+    globalStore.setLoadingState(true);
+
     await dialog.warning({
       title: '确认删除',
       content: `是否删除类别"${category.name}"？该类别下的所有工具也将被删除，此操作不可恢复。`,
@@ -295,6 +294,8 @@ async function confirmDeleteCategory(category: ToolCategory) {
     });
   } catch (error) {
     message.error('删除类别失败');
+  } finally {
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -306,6 +307,8 @@ async function addNewCategory(name: string) {
   }
   
   try {
+    globalStore.setLoadingState(true);
+
     // 先检查是否已存在同名类别
     const existingCategory = categoryStore.categories.find(cat => 
       cat.name.toLowerCase() === name.trim().toLowerCase()
@@ -326,6 +329,8 @@ async function addNewCategory(name: string) {
     message.error('添加类别失败');
     console.error(error);
     // 发生错误时保持模态框打开
+  } finally {
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -370,6 +375,8 @@ function showToolFormModal(key: string) {
 // 修改确认删除工具函数
 async function confirmDeleteTool(tool: Tool) {
   try {
+    globalStore.setLoadingState(true);
+
     await dialog.warning({
       title: '确认删除',
       content: `是否删除工具"${tool.name}"？此操作不可恢复。`,
@@ -391,6 +398,8 @@ async function confirmDeleteTool(tool: Tool) {
   } catch (error) {
     console.error('删除工具出错:', error);
     message.error('删除工具时发生错误');
+  } finally {
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -413,9 +422,9 @@ function getTypeDisplay(type: string): string {
   switch(type) {
     case 'js':
       return 'JavsScript';
-    case 'mcp-io':
+    case 'mcpIo':
       return 'MCP-IO';
-    case 'mcp-sse':
+    case 'mcpSse':
       return 'MCP-SSE';
     default:
       return type.toUpperCase();
@@ -445,6 +454,8 @@ function openEditCategory(category: ToolCategory) {
 // 编辑分类
 async function updateCategory(category: ToolCategory) {
   try {
+    globalStore.setLoadingState(true);
+
     // 检查类别名称是否存在
     const duplicatedCategory = categoryStore.categories.find(
       c => c.name.toLowerCase() === category.name.toLowerCase() && 
@@ -468,16 +479,26 @@ async function updateCategory(category: ToolCategory) {
   } catch (error) {
     console.error('更新分类时出错:', error);
     message.error('更新分类时发生错误');
+  } finally {
+    globalStore.setLoadingState(false);
   }
 }
 
 // 在组件挂载时加载数据
 onMounted(async () => {
   console.log('Tools view mounted');
-  await categoryStore.fetchCategories();
+  try {
+    globalStore.setLoadingState(true);
+    await categoryStore.fetchCategories();
   
-  // 只获取所有工具数据，不再按分类获取
-  await toolStore.fetchAllTools();
+    // 只获取所有工具数据，不再按分类获取
+    await toolStore.fetchAllTools();
+  
+  } catch (error) {
+    console.error('加载工具数据时出错:', error);
+  } finally {
+    globalStore.setLoadingState(false);
+  }
 });
 
 // 组件卸载时清理状态
@@ -558,18 +579,19 @@ onBeforeUnmount(() => {
 }
 
 .tool-card {
-  height: 180px; /* 固定卡片高度 */
+  min-height: unset;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  position: relative;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 4px;
 }
 
 .tool-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+  background-color: rgba(24, 160, 88, 0.02);
 }
 
 /* 工具类型标签样式 */
@@ -583,33 +605,22 @@ onBeforeUnmount(() => {
 .tool-card-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 4px;
 }
 
 .tool-card-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
-}
-
-.tool-card-description {
-  color: var(--text-color-secondary);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
-  font-size: 13px;
 }
 
 .tool-card-footer {
-  margin-top: auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -635,19 +646,6 @@ onBeforeUnmount(() => {
 
 :deep(.n-button) {
   font-weight: 500;
-}
-
-:deep(.n-modal .n-card) {
-  border-radius: 8px !important;
-  overflow: hidden;
-}
-
-:deep(.n-card-header) {
-  padding-bottom: 8px;
-}
-
-:deep(.n-card-footer) {
-  padding-top: 8px;
 }
 
 .category-item-wrapper {
@@ -746,19 +744,6 @@ html.dark .category-action-btn:hover {
   .tools-search {
     width: 100%;
   }
-}
-
-/* 响应式布局 */
-@media (max-width: 1400px) {
-  .n-grid { grid-template-columns: repeat(3, 1fr) !important; }
-}
-
-@media (max-width: 1100px) {
-  .n-grid { grid-template-columns: repeat(2, 1fr) !important; }
-}
-
-@media (max-width: 768px) {
-  .n-grid { grid-template-columns: repeat(1, 1fr) !important; }
 }
 
 </style>

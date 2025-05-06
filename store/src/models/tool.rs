@@ -100,7 +100,7 @@ pub struct Tool {
     /// 名称
     pub name: String,
     /// 描述
-    pub description: String,
+    pub description: Option<String>,
     /// 工具数据
     pub data: ToolData,
     /// 创建时间

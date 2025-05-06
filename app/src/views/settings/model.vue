@@ -46,7 +46,7 @@
       <!-- 右侧内容区域改用新组件 -->
       <n-layout position="absolute" style="left: 220px; right: 0;" class="provider-content">
         <n-scrollbar class="scrollbar-container">
-          <n-spin :show="providerStore.loading">
+          <n-spin :show="globalStore.isLoading" size="large">
             <n-empty 
               v-if="!currentProvider && !isCreating" 
               description="请选择或创建模型提供商" 
@@ -78,6 +78,7 @@ import {
   NTag, NSpin, useMessage
 } from 'naive-ui';
 import { AddOutline } from '@vicons/ionicons5';
+import { useGlobalStore } from '../../stores/globalStore';
 import { useProviderStore } from '../../stores/providerStore';
 import { Provider } from '../../services/typings';
 import ProviderForm from './components/ProviderForm.vue';
@@ -90,12 +91,15 @@ const currentProvider = ref<Provider | undefined>(undefined);
 const isCreating = ref(false);
 
 // Store
+const globalStore = useGlobalStore();
 const providerStore = useProviderStore();
 
 // 处理提供商提交
 async function handleProviderSubmit(provider: Partial<Provider>) {
   console.log('提交的提供商:', provider);
   try {
+    globalStore.setLoadingState(true);
+
     if (isCreating.value) {
       await providerStore.createProvider(provider as Provider);
       message.success('创建提供商成功');
@@ -108,12 +112,16 @@ async function handleProviderSubmit(provider: Partial<Provider>) {
     }
   } catch (error) {
     message.error('保存提供商失败');
+  } finally {
+    globalStore.setLoadingState(false);
   }
 }
 
 // 处理提供商删除
 async function handleProviderDelete(id: number) {
   try {
+    globalStore.setLoadingState(true);
+
     const success = await providerStore.removeProvider(id);
     if (success) {
       message.success('提供商已删除');
@@ -127,6 +135,8 @@ async function handleProviderDelete(id: number) {
   } catch (error) {
     console.error('删除提供商失败:', error);
     message.error('删除提供商失败');
+  } finally {
+    globalStore.setLoadingState(false);
   }
 }
 
@@ -170,6 +180,8 @@ function getApiCategoryTagType(category: string): 'success' | 'info' | 'warning'
 // 初始化
 onMounted(async () => {
   try {
+    globalStore.setLoadingState(true);
+
     await providerStore.fetchAllProviders();
     
     const providerId = route.query.providerId ? Number(route.query.providerId) : null;
@@ -182,6 +194,8 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to fetch providers:', error);
     message.error('加载提供商列表出错');
+  } finally {
+    globalStore.setLoadingState(false);
   }
 });
 </script>

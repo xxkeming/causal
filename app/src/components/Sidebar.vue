@@ -9,15 +9,6 @@
         </template>
         对话
       </n-tooltip>
-      
-      <!-- <n-tooltip placement="right" trigger="hover">
-        <template #trigger>
-          <div class="sidebar-icon" :class="{ active: activeIcon === 'messages' }" @click="setActive('messages')">
-            <n-icon size="24"><ChatbubbleOutline /></n-icon>
-          </div>
-        </template>
-        消息
-      </n-tooltip> -->
 
       <n-tooltip placement="right" trigger="hover">
         <template #trigger>

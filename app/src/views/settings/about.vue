@@ -56,7 +56,7 @@
         <n-divider />
 
         <div class="copyright">
-          <p>© {{ currentYear }} { appN } 团队. 保留所有权利。</p>
+          <p>© {{ currentYear }} {{ appN }} 团队. 保留所有权利。</p>
         </div>
       </div>
     </div>
@@ -94,12 +94,12 @@ const systemInfo = ref({
 
 // 技术栈信息 - 修复类型问题
 const techStack = [
+  { name: 'Tauri', type: 'primary' as const },
+  { name: 'Rust', type: 'info' as const },
   { name: 'Vue 3', type: 'success' as const },
-  { name: 'TypeScript', type: 'info' as const },
-  { name: 'Vite', type: 'warning' as const },
   { name: 'Naive UI', type: 'success' as const },
-  { name: 'Pinia', type: 'info' as const },
-  { name: 'Tauri', type: 'primary' as const }
+  { name: 'Vite', type: 'warning' as const },
+  
 ];
 
 // 许可证信息
@@ -108,6 +108,11 @@ const licenses = [
     name: 'Tauri', 
     type: 'MIT/Apache-2.0 许可证', 
     description: '构建更小、更快、更安全的桌面应用程序' 
+  },
+  { 
+    name: 'Rust', 
+    type: 'MIT/Apache-2.0 许可证', 
+    description: '安全、并发和快速的系统编程语言' 
   },
   { 
     name: 'Vue.js', 

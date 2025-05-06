@@ -5,7 +5,6 @@ import { ChatSession } from '../services/typings';
 
 export const useChatSessionStore = defineStore('chatSession', () => {
   const sessions = ref<ChatSession[]>([]);
-  const loading = ref(false);
   const initialized = ref(false);
 
   /**
@@ -14,7 +13,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
   async function fetchAllSessions() {
     if (initialized.value) return;
     
-    loading.value = true;
     try {
       sessions.value = await api.getAllSessions();
 
@@ -24,8 +22,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
       initialized.value = true;
     } catch (error) {
       console.error('Failed to initialize chat sessions:', error);
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -47,7 +43,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
    * 创建新会话
    */
   async function createNewSession(agentId: number, topic: string): Promise<ChatSession> {
-    loading.value = true;
     try {
       const newSession = await api.addSession({
         agentId,
@@ -69,8 +64,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     } catch (error) {
       console.error('Failed to create chat session:', error);
       throw error;
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -78,7 +71,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
    * 更新会话
    */
   async function updateSession(sessionId: number, updateData: Partial<ChatSession>): Promise<boolean> {
-    loading.value = true;
     try {
       const sessionIndex = sessions.value.findIndex(s => s.id === sessionId);
       if (sessionIndex === -1) {
@@ -106,8 +98,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     } catch (error) {
       console.error(`Failed to update chat session ${sessionId}:`, error);
       return false;
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -115,7 +105,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
    * 删除会话
    */
   async function deleteSession(sessionId: number): Promise<boolean> {
-    loading.value = true;
     try {
       const success = await api.deleteSession(sessionId);
       
@@ -128,8 +117,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
     } catch (error) {
       console.error(`Failed to delete chat session ${sessionId}:`, error);
       return false;
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -190,7 +177,6 @@ export const useChatSessionStore = defineStore('chatSession', () => {
 
   return {
     sessions,
-    loading,
     initialized,
     recentSessions,
     fetchAllSessions,

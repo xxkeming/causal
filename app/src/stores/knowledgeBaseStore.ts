@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { useGlobalStore } from './globalStore';
 import { KnowledgeBase } from '../services/typings';
 import { 
   getAllKnowledgeBases, getKnowledgeBaseById,
@@ -8,13 +7,11 @@ import {
 } from '../services/api';
 
 export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
-  const globalStore = useGlobalStore();
   const knowledgeBases = ref<KnowledgeBase[]>([]);
   const error = ref<string | null>(null);
   const needRefresh = ref(true);
   
   async function fetchAllKnowledgeBases() {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -25,13 +22,10 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
     } catch (err) {
       console.error('Failed to fetch knowledge bases:', err);
       error.value = '获取知识库失败';
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   async function fetchKnowledgeBaseById(id: string) {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -41,13 +35,10 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       console.error(`Failed to fetch knowledge base with id ${id}:`, err);
       error.value = '获取知识库详情失败';
       return null;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   async function createKnowledgeBase(knowledgeBaseData: Omit<KnowledgeBase, 'id' | 'createdAt'>) {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -58,13 +49,10 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       console.error('Failed to create knowledge base:', err);
       error.value = '创建知识库失败';
       throw err;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   async function modifyKnowledgeBase(knowledgeBaseData: KnowledgeBase) {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -78,13 +66,10 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       console.error(`Failed to update knowledge base with id ${knowledgeBaseData.id}:`, err);
       error.value = '更新知识库失败';
       throw err;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   async function removeKnowledgeBase(id: string) {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -97,8 +82,6 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       console.error(`Failed to delete knowledge base with id ${id}:`, err);
       error.value = '删除知识库失败';
       return false;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
@@ -108,7 +91,6 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
   
   return {
     knowledgeBases,
-    loading: globalStore.isLoading,
     error,
     needRefresh,
     fetchAllKnowledgeBases,

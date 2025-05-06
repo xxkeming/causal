@@ -1,17 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { useGlobalStore } from './globalStore';
 import * as api from '../services/api';
 import { ToolCategory } from '../services/typings';
 
 export const useToolCategoryStore = defineStore('toolCategory', () => {
-  const globalStore = useGlobalStore();
   const categories = ref<ToolCategory[]>([]);
   const error = ref<string | null>(null);
   
   // 获取所有工具类别
   async function fetchCategories() {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -21,14 +18,11 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
     } catch (err) {
       console.error('Failed to fetch tool categories:', err);
       error.value = '获取工具类别失败';
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   // 添加工具类别
   async function addCategory(name: string) {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -38,14 +32,11 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
       console.error('Failed to add tool category:', err);
       error.value = '添加工具类别失败';
       throw err;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   // 删除工具类别
   async function removeCategory(id: number) {
-    globalStore.setLoadingState(true);
     error.value = null;
     
     try {
@@ -61,8 +52,6 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
       console.error(`Failed to delete tool category ${id}:`, err);
       error.value = '删除工具类别失败';
       return false;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
 
@@ -70,7 +59,6 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
    * 更新工具类别
    */
   async function updateCategory(category: ToolCategory): Promise<boolean> {
-    globalStore.setLoadingState(true);
     try {
       // 调用API更新类别
       const result = await api.updateToolCategory(category);
@@ -87,14 +75,11 @@ export const useToolCategoryStore = defineStore('toolCategory', () => {
     } catch (error) {
       console.error('Failed to update category:', error);
       return false;
-    } finally {
-      globalStore.setLoadingState(false);
     }
   }
   
   return {
     categories,
-    loading: globalStore.isLoading,
     error,
     fetchCategories,
     addCategory,

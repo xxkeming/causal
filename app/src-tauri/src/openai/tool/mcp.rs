@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rmcp::{
-    RoleClient, Service, ServiceExt,
+    RoleClient, ServiceExt,
     model::{
         CallToolRequestParam, ClientCapabilities, ClientInfo, Implementation,
         InitializeRequestParam, ListToolsResult,
