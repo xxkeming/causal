@@ -121,9 +121,14 @@ impl Store {
     pub fn add_chat_message(&self, message: ChatMessage) -> Result<ChatMessage, StoreError> {
         let mut message_to_save = message;
 
+        if message_to_save.id == 0 {
+            // 如果没有ID，则生成一个新的ID
+            message_to_save.id = Utc::now().timestamp_millis() as u64;
+        }
+
         // 确保时间戳有值
         if message_to_save.created_at == 0 {
-            message_to_save.created_at = Utc::now().timestamp();
+            message_to_save.created_at = Utc::now().timestamp_millis();
         }
 
         // 验证会话是否存在
@@ -219,17 +224,18 @@ impl Store {
     pub fn get_latest_messages_by_session(
         &self, session_id: u64, limit: usize,
     ) -> Result<Vec<ChatMessage>, StoreError> {
-        let mut messages = self.get_messages_by_session(session_id)?;
+        let mut sorted_messages = self.get_messages_by_session(session_id)?;
 
-        // 按时间戳排序（降序）
-        messages.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        sorted_messages.sort_by(|a, b| b.id.cmp(&a.id));
 
         // 限制返回数量
-        if messages.len() > limit {
-            messages.truncate(limit);
+        if sorted_messages.len() > limit {
+            sorted_messages.truncate(limit);
         }
 
-        Ok(messages)
+        sorted_messages.sort_by(|a, b| a.id.cmp(&b.id));
+
+        Ok(sorted_messages)
     }
 
     /// 根据会话里面的一条消息,查找指定条数的消息
@@ -346,6 +352,7 @@ mod tests {
             id: 1,
             session_id: 1,
             role: Role::User,
+            reasoning_content: None,
             content: "你好，这是一条测试消息".to_string(),
             status: MessageStatus::Sending,
             cost: None,
@@ -389,6 +396,7 @@ mod tests {
                 id: i,
                 session_id: 1,
                 role: if i % 2 == 0 { Role::User } else { Role::Assistant },
+                reasoning_content: None,
                 content: format!("测试消息 {}", i),
                 status: MessageStatus::Success,
                 cost: Some(i as i64),
@@ -428,6 +436,7 @@ mod tests {
             id: 10,
             session_id: 1,
             role: Role::User,
+            reasoning_content: None,
             content: "新的测试消息".to_string(),
             status: MessageStatus::Sending,
             cost: None,
@@ -463,6 +472,7 @@ mod tests {
             id: 1,
             session_id: 999, // 不存在的会话ID
             role: Role::User,
+            reasoning_content: None,
             content: "测试消息".to_string(),
             status: MessageStatus::Success,
             cost: None,

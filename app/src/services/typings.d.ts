@@ -238,6 +238,7 @@ export interface ChatMessage {
   sessionId: number;
 
   role: 'user' | 'assistant' | 'system';
+  reasoningContent?: string;
   content: string;
 
   //工具消息结果

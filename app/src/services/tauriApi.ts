@@ -1,5 +1,6 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { openPath, openUrl } from '@tauri-apps/plugin-opener';
+import { ChatMessage } from "./typings";
 
 interface Response {
   status: string;
@@ -34,6 +35,19 @@ export async function fetch_local(name: string, data: Object | null): Promise<Ob
 export type  MessageEvent =
 | {
     event: 'started';
+  }
+|
+  {
+    event: 'userMessage';
+    data: {
+      message: ChatMessage;
+    };
+  }
+| {
+    event: 'assistantMessage';
+    data: {
+      message: ChatMessage;
+    };
   }
 |
   {
@@ -73,9 +87,9 @@ export type  MessageEvent =
  * @param content 发送的消息
  * @returns 返回问候语的Promise
  */
-export async function event_local(agentId: number, sessionId: number, messageId: number, time: boolean, search: boolean, stream: boolean, onData: (event: MessageEvent) => void): Promise<Object> {
+export async function event_local(message: ChatMessage, time: boolean, search: boolean, stream: boolean, onData: (event: MessageEvent) => void): Promise<Object> {
   try {
-    console.log('event_local:', agentId, sessionId, messageId);
+    console.log('event_local:', message);
 
     const onEvent = new Channel<MessageEvent>();
     onEvent.onmessage = (message) => {
@@ -84,7 +98,7 @@ export async function event_local(agentId: number, sessionId: number, messageId:
     };
     
     // data 转json字符串
-    let result = await invoke('event', { agent: agentId, session: sessionId, message: messageId, search, time, stream, onEvent }) as Response;
+    let result = await invoke('event', { message: message, search, time, stream, onEvent }) as Response;
     console.log('event_local result:', result);
 
     if (result.status === "error") {

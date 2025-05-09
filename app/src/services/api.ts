@@ -369,8 +369,8 @@ export async function deleteMessagesBySession(sessionId: number): Promise<boolea
 }
 
 // 模拟流式输出的聊天接口（逐字输出，间隔10毫秒）
-export async function chatEvent(agentId: number, sessionId: number, messageId: number, search: boolean, time: boolean, stream: boolean, onData: (chunk: tauriApi.MessageEvent) => void) {
-  return tauriApi.event_local(agentId, sessionId, messageId, time, search, stream, onData);
+export async function chatEvent(message: ChatMessage, search: boolean, time: boolean, stream: boolean, onData: (chunk: tauriApi.MessageEvent) => void) {
+  return tauriApi.event_local(message, time, search, stream, onData);
 }
 
 export async function chatEventExit(messageId: number) {

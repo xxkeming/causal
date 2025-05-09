@@ -33,15 +33,13 @@ async fn fetch(
 #[tauri::command]
 async fn event(
     tasks: tauri::State<'_, api::event::MessageTasks>, store: tauri::State<'_, store::Store>,
-    agent: u64, session: u64, message: u64, search: bool, time: bool, stream: bool,
+    message: store::ChatMessage, search: bool, time: bool, stream: bool,
     on_event: tauri::ipc::Channel<api::event::MessageEvent>,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::event::event(tasks, store, agent, session, message, search, time, stream, on_event)
-        .await
-        .map_err(|e| {
-            tracing::error!("event error: {}", e.to_string());
-            e.into()
-        })
+    api::event::event(tasks, store, message, search, time, stream, on_event).await.map_err(|e| {
+        tracing::error!("event error: {}", e.to_string());
+        e.into()
+    })
 }
 
 #[tauri::command]

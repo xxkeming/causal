@@ -226,7 +226,7 @@ async function loadAgentInfo() {
 // 添加消息 - 仅更新本地状态，API调用在其他函数中进行
 function addMessage(message: ChatMessage) {
   // 添加到本地消息列表
-  messages.value.push(message);
+  const index = messages.value.push(message);
 
   // 如果是有会话的情况，更新会话的更新时间
   if (currentSessionId.value) {
@@ -241,6 +241,7 @@ function addMessage(message: ChatMessage) {
       }
     });
   }
+  return index - 1; // 返回消息索引
 }
 
 // 添加滚动到底部的辅助函数
@@ -269,7 +270,7 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
   try {
     // 添加用户消息
     const userMessage = {
-      id: Date.now(), // 临时ID，API会替换
+      id: 0,
       sessionId: currentSessionId.value as number,
       role: 'user' as const,
       content: text,
@@ -277,32 +278,10 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
       createdAt: Date.now(),
       attachments: attachments ? attachments : undefined
     };
-    
-    // 通过API添加用户消息
-    const savedUserMessage = await api.addMessage(userMessage);
-    addMessage(savedUserMessage);
-    scrollToBottom(); // 用户消息添加后滚动
-
-    // 添加助手消息
-    const assistantMessage = {
-      id: savedUserMessage.id + 1, // 临时ID，API会替换
-      sessionId: currentSessionId.value as number,
-      role: 'assistant' as const,
-      content: '',
-      status: 'sending', // 使用与API匹配的状态
-      createdAt: Date.now()
-    };
-    
-    // 通过API添加助手初始消息
-    const savedAssistantMessage = await api.addMessage(assistantMessage);
-    addMessage(savedAssistantMessage);
-    scrollToBottom(); // 助手消息添加后滚动
-
-    const assistantIndex = messages.value.findIndex(msg => msg.id === savedAssistantMessage.id);
 
     globalStore.setLoadingState(true);
     // 将文件信息传递给API
-    await sendApiMessage(agent.value.id as number, currentSessionId.value as number, savedAssistantMessage.id, assistantIndex);
+    await sendApiMessage(userMessage);
   } catch (error) {
     console.error('API 请求失败:', error);
     message.error('发送消息失败: ' + error);
@@ -311,16 +290,31 @@ async function sendMessage(text: string, attachments?: Attachment[]) {
   }
 }
 
-async function sendApiMessage(agentId: number, sessionId: number, messageId: number, assistantIndex: number) {
+async function sendApiMessage(userMessage: ChatMessage) {
+  let assistantIndex = -1;
+
   try {
-    currentMessageId.value = messageId;
+    if (userMessage.id !== 0) {
+      currentMessageId.value = userMessage.id;
+      assistantIndex = messages.value.findIndex(msg => msg.id === userMessage.id + 1);
+    }
 
     // 模拟流式输出，将文件信息传递给API
-    await chatEvent(agentId, sessionId, messageId, search.value, time.value, stream.value, async (event: MessageEvent) => {
+    await chatEvent(userMessage, search.value, time.value, stream.value, async (event: MessageEvent) => {
       switch (event.event) {
         case 'started':
           console.log('started');
           messages.value[assistantIndex].content = '';
+          break;
+        case 'userMessage':
+          // 更新用户消息的状态
+          currentMessageId.value = event.data.message.id;
+          addMessage(event.data.message);
+          scrollToBottom(); // 用户消息添加后滚动
+          break;
+        case 'assistantMessage':
+          assistantIndex = addMessage(event.data.message);
+          scrollToBottom(); // 用户消息添加后滚动
           break;
         case 'finished':
           // 要等到流式输出完成后再更新最终状态
@@ -335,7 +329,7 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
           console.log(JSON.stringify(event.data));
 
           // 通过API更新最终状态
-          await api.updateMessage(messages.value[assistantIndex]);
+          // await api.updateMessage(messages.value[assistantIndex]);
           break;
         case 'reasoningContent':
           // 处理流式输出
@@ -359,10 +353,11 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
           break;
         case 'tool':
           // 更新工具结果消息
-          if (!messages.value[assistantIndex].tools) {
-            messages.value[assistantIndex].tools = [];
+          const assistantMessage = messages.value[assistantIndex];
+          if (!assistantMessage.tools) {
+            assistantMessage.tools = [];
           }
-          messages.value[assistantIndex].tools.push(event.data);
+          assistantMessage.tools.push(event.data);
           console.log('tool', messages.value[assistantIndex].tools);
           break;
       }
@@ -373,17 +368,16 @@ async function sendApiMessage(agentId: number, sessionId: number, messageId: num
   } catch (error) {
     console.error('API 请求失败:', error);
 
-    const errorMessage = {
-      ...messages.value[assistantIndex],
-      content: JSON.stringify(error),
-      status: 'error'
-    };
-    
-    // 通过API更新错误状态
-    await api.updateMessage(errorMessage);
-    
-    // 更新本地状态
-    messages.value[assistantIndex] = errorMessage;
+    if (assistantIndex !== -1) {
+        const errorMessage = {
+        ...messages.value[assistantIndex],
+        content: JSON.stringify(error),
+        status: 'error'
+      };
+      
+      // 更新本地状态
+      messages.value[assistantIndex] = errorMessage;
+    }
     throw error;
   }
 }
@@ -407,14 +401,14 @@ async function retryMessage(index: number) {
   try {
     globalStore.setLoadingState(true);
 
+    messages.value[index].reasoningContent = undefined; // 清空推理内容
     messages.value[index].content = ''; // 清空当前消息内容
     messages.value[index].tools = []; // 清空工具结果
     messages.value[index].status = 'sending'; // 设置状态为发送中
     messages.value[index].createdAt = Date.now(); // 更新创建时间
-    await api.updateMessage(messages.value[index]);
 
     // 重新发送用户消息
-    await sendApiMessage(agent.value.id as number, currentSessionId.value as number, currentMessage.id, index);
+    await sendApiMessage(userMessage);
   } catch (error) {
     console.error('重试消息失败:', error);
     message.error('重试消息失败:' + error);

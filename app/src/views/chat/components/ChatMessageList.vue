@@ -127,7 +127,7 @@
               <!-- 显示正常内容，添加key强制重渲染 -->
               <markdown-renderer 
                 v-else-if="message.role === 'assistant'" 
-                :content="message.content" 
+                :content="message.reasoningContent ? '<think>' + message.reasoningContent + '</think>' +  message.content: message.content" 
                 :key="`md-${index}-${message.updatedAt || message.createdAt}`"
               />
               <div v-else class="user-message-content">{{ message.content }}</div>

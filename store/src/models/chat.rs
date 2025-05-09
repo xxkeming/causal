@@ -19,6 +19,7 @@ pub enum MessageStatus {
     Sent,
     Processing,
     Processed,
+    Reasoning,
     Failed,
     Timeout,
     Success,
@@ -58,6 +59,9 @@ pub struct ChatMessage {
     pub session_id: u64,
     /// 角色
     pub role: Role,
+    /// 思考内容
+    #[serde(rename = "reasoningContent")]
+    pub reasoning_content: Option<String>,
     /// 内容
     pub content: String,
     /// 工具结果
@@ -89,6 +93,46 @@ pub struct ChatMessage {
     /// 创建时间
     #[serde(rename = "createdAt")]
     pub created_at: i64,
+}
+
+impl ChatMessage {
+    pub fn new_user(session: u64, message: String, attachments: Option<Vec<Attachment>>) -> Self {
+        Self {
+            id: 0,
+            session_id: session,
+            role: Role::User,
+            reasoning_content: None,
+            content: message,
+            tools: None,
+            attachments: attachments,
+            status: MessageStatus::Sending,
+            feedback: 0,
+            cost: None,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
+            created_at: 0,
+        }
+    }
+
+    pub fn new_assistant(id: u64, session: u64) -> Self {
+        Self {
+            id: id,
+            session_id: session,
+            role: Role::Assistant,
+            reasoning_content: None,
+            content: "".to_string(),
+            tools: None,
+            attachments: None,
+            status: MessageStatus::Sending,
+            feedback: 0,
+            cost: None,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
+            created_at: 0,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

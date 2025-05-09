@@ -14,6 +14,7 @@ use async_openai::{
 use futures::StreamExt;
 use serde::Serialize;
 use serde_json::{Value, json};
+use store::ChatMessage;
 use tokio::{
     sync::{Mutex, RwLock, mpsc, watch},
     task::JoinSet,
@@ -31,10 +32,18 @@ pub struct MessageTask {
 
 pub type MessageTasks = Arc<RwLock<HashMap<u64, MessageTask>>>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 pub enum MessageEvent {
-    Started,
+    UserMessage {
+        message: store::ChatMessage,
+    },
+    AssistantMessage {
+        message: store::ChatMessage,
+    },
+    RetryAssistantMessage {
+        message: store::ChatMessage,
+    },
     ReasoningContent {
         content: String,
     },
@@ -282,41 +291,130 @@ async fn event_chat(
 }
 
 pub async fn event(
-    tasks: tauri::State<'_, MessageTasks>, store: tauri::State<'_, store::Store>, agent_id: u64,
-    session_id: u64, message_id: u64, search: bool, time: bool, stream: bool,
+    tasks: tauri::State<'_, MessageTasks>, store: tauri::State<'_, store::Store>,
+    message: ChatMessage, search: bool, time: bool, stream: bool,
     on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
-    let Some(agent) = store.get_agent(agent_id)? else {
-        return Err(error::Error::InvalidData(format!("Agent with id {agent_id} not found")));
-    };
+    let session = store.get_chat_session(message.session_id)?.ok_or_else(|| {
+        error::Error::InvalidData(format!("Session with id {} not found", message.id))
+    })?;
+
+    let agent = store.get_agent(session.agent_id)?.ok_or_else(|| {
+        error::Error::InvalidData(format!("Agent with id {} not found", session.agent_id))
+    })?;
 
     let Some(model) = agent.model.as_ref() else {
         return Err(error::Error::InvalidData(format!("Model with {:?} not found", agent.model)));
     };
 
-    let provider = store.get_provider(model.id)?;
-    let Some(provider) = provider else {
-        return Err(error::Error::InvalidData(format!("Provider with {:?} not found", model)));
+    let provider = store
+        .get_provider(model.id)?
+        .ok_or_else(|| error::Error::InvalidData(format!("Provider with {:?} not found", model)))?;
+
+    let (sender_event, mut receiver_event) = mpsc::channel::<MessageEvent>(32);
+    let task_store = (*store).clone();
+    tokio::spawn(async move {
+        let mut assistant: Option<ChatMessage> = None;
+        while let Some(event) = receiver_event.recv().await {
+            tracing::info!("Event: {:?}", event);
+
+            match &event {
+                MessageEvent::AssistantMessage { message } => {
+                    assistant = task_store.add_chat_message(message.clone()).ok();
+                }
+                MessageEvent::RetryAssistantMessage { message } => {
+                    assistant = Some(message.clone());
+                }
+                MessageEvent::ReasoningContent { content } => {
+                    if let Some(assistant) = assistant.as_mut() {
+                        match assistant.reasoning_content {
+                            Some(ref mut reasoning_content) => {
+                                reasoning_content.push_str(content.as_str());
+                            }
+                            None => {
+                                assistant.reasoning_content = Some(content.clone());
+                            }
+                        }
+                    }
+                }
+                MessageEvent::Content { content } => {
+                    if let Some(assistant) = assistant.as_mut() {
+                        assistant.content.push_str(content.as_str());
+                    }
+                }
+                MessageEvent::Finished { cost, prompt_tokens, completion_tokens, total_tokens } => {
+                    if let Some(assistant) = assistant.as_mut() {
+                        assistant.cost = Some(*cost);
+                        assistant.prompt_tokens = Some(*prompt_tokens);
+                        assistant.completion_tokens = Some(*completion_tokens);
+                        assistant.total_tokens = Some(*total_tokens);
+                        assistant.status = store::MessageStatus::Success;
+                        if let Err(e) = task_store.update_chat_message(assistant.clone()) {
+                            tracing::error!("Error updating message: {:?}", e);
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            if let Err(e) = on_event.send(event) {
+                tracing::error!("Error sending event: {:?}", e);
+            }
+        }
+        // tracing::info!("Event task {} exit", message_id);
+    });
+
+    let (message, histroy) = if message.id == 0 {
+        let histroy = store
+            .get_latest_messages_by_session(message.session_id, agent.context_size as usize * 2)?;
+
+        let message = store.add_chat_message(message)?;
+        sender_event
+            .send(MessageEvent::UserMessage { message: message.clone() })
+            .await
+            .map_err(|_| error::Error::Unknown)?;
+
+        let assistant = ChatMessage::new_assistant(message.id + 1, message.session_id);
+        sender_event
+            .send(MessageEvent::AssistantMessage { message: assistant })
+            .await
+            .map_err(|_| error::Error::Unknown)?;
+
+        (message, histroy)
+    } else {
+        let mut histroy = store.get_messages_by_session_and_message(
+            message.session_id,
+            message.id + 1,
+            agent.context_size as usize * 2 + 2,
+        )?;
+        // tracing::info!("histroy: {:?}", histroy);
+
+        let Some(assistant) = histroy.pop() else {
+            return Err(error::Error::InvalidData(format!(
+                "Message Assistant {} with id {} not found",
+                histroy.len(),
+                message.id - 1
+            )));
+        };
+        let assistant = ChatMessage::new_assistant(assistant.id, assistant.session_id);
+        sender_event
+            .send(MessageEvent::RetryAssistantMessage { message: assistant })
+            .await
+            .map_err(|_| error::Error::Unknown)?;
+
+        let Some(message) = histroy.pop() else {
+            return Err(error::Error::InvalidData(format!(
+                "Message User {} with id {} not found",
+                histroy.len(),
+                message.id - 1
+            )));
+        };
+        (message, histroy)
     };
 
-    // tracing::info!("Provider: {:?}", provider);
-
-    let mut contexts = store.get_messages_by_session_and_message(
-        session_id,
-        message_id - 1,
-        agent.context_size as usize * 2 + 1,
-    )?;
-    // for context in contexts.iter() {
-    //     tracing::info!("Message: {:?}", context.content);
-    // }
-
-    let Some(context) = contexts.pop() else {
-        return Err(error::Error::InvalidData(format!(
-            "Message with id {} not found",
-            message_id - 1
-        )));
-    };
-    let mut context = chat::Message::new_user(context)?;
+    // chat(tasks, store, agent, provider, message, histroy, search, time, stream, sender_event).await
+    let message_id = message.id;
+    let mut message = chat::Message::new_user(message)?;
 
     let mut search = if search { Some(store.get_search()?) } else { None };
 
@@ -324,27 +422,28 @@ pub async fn event(
     if let Some(search) = search.take_if(|v| v.mode == 1) {
         let search = Search::new(search).into_tool_object()?;
 
-        let query = json!({"query": context.content.clone()});
+        let query = json!({"query": message.content.clone()});
         let search = search.call("search", query.clone()).await?;
 
-        on_event
+        sender_event
             .send(MessageEvent::Tool {
                 id: "0".to_string(),
                 name: "web search".to_string(),
                 arguments: query.to_string(),
                 result: search.to_string(),
             })
+            .await
             .map_err(|_| error::Error::Unknown)?;
 
-        context.content =
-            format!("{}\n\nweb search results\n{}\n\n", context.content, search.to_string());
+        message.content =
+            format!("{}\n\nweb search results\n{}\n\n", message.content, search.to_string());
     }
 
     // 上下文附加当前时间
     if time {
-        context.content =
-            format!("{}\n\ncurrent utc time:{}\n\n", context.content, time::UtcDateTime::now());
-        // tracing::info!("Message: {:?}", context.content);
+        message.content =
+            format!("{}\n\ncurrent utc time:{}\n\n", message.content, time::UtcDateTime::now());
+        // tracing::info!("Message: {:?}", message.content);
     }
 
     let config = async_openai::config::OpenAIConfig::new()
@@ -388,10 +487,10 @@ pub async fn event(
             .into(),
     ];
 
-    for context in contexts.into_iter() {
-        messages.push(chat::Message::new(context, agent.context_extend).try_into()?);
+    for message in histroy.into_iter() {
+        messages.push(chat::Message::new(message, agent.context_extend).try_into()?);
     }
-    messages.push(context.try_into()?);
+    messages.push(message.try_into()?);
 
     // on_event.send(MessageEvent::Started).map_err(|_| error::Error::Unknown)?;
 
@@ -400,17 +499,6 @@ pub async fn event(
 
     let (sender_exit, mut receiver_exit) = watch::channel(());
     tasks.write().await.insert(message_id, MessageTask { exit: sender_exit });
-
-    let (sender_event, mut receiver_event) = mpsc::channel::<MessageEvent>(32);
-    tokio::spawn(async move {
-        while let Some(event) = receiver_event.recv().await {
-            tracing::info!("Event: {:?}", event);
-            if let Err(e) = on_event.send(event) {
-                tracing::error!("Error sending event: {:?}", e);
-            }
-        }
-        tracing::info!("Event task {} exit", message_id);
-    });
 
     loop {
         let task = async {
@@ -455,7 +543,29 @@ pub async fn event(
                 if result.as_ref().map(|r|!r.0).unwrap_or(true) {
                     tasks.write().await.remove(&message_id);
                 }
-                result?
+                match result {
+                    Ok((is_continue, usage)) => (is_continue, usage),
+                    Err(e) => {
+                        let (prompt_tokens, completion_tokens, total_tokens) =
+                            usages.into_iter().fold((0, 0, 0), |(prompt, completion, total), usage: CompletionUsage| {
+                                (
+                                    prompt + usage.prompt_tokens,
+                                    completion + usage.completion_tokens,
+                                    total + usage.total_tokens,
+                                )
+                            });
+
+                        let finised = MessageEvent::Finished {
+                            cost: cost.elapsed().as_millis() as i64,
+                            prompt_tokens: prompt_tokens,
+                            completion_tokens: completion_tokens,
+                            total_tokens: total_tokens,
+                        };
+
+                        let _ = sender_event.send(finised).await;
+                        return Err(e);
+                    }
+                }
             }
         };
 
@@ -468,10 +578,8 @@ pub async fn event(
         }
     }
 
-    let (prompt_tokens, completion_tokens, total_tokens) = usages
-        .into_iter()
-        // .filter_map(|usage| usage)
-        .fold((0, 0, 0), |(prompt, completion, total), usage| {
+    let (prompt_tokens, completion_tokens, total_tokens) =
+        usages.into_iter().fold((0, 0, 0), |(prompt, completion, total), usage| {
             (
                 prompt + usage.prompt_tokens,
                 completion + usage.completion_tokens,
@@ -485,7 +593,6 @@ pub async fn event(
         completion_tokens: completion_tokens,
         total_tokens: total_tokens,
     };
-    tracing::info!("Finished: {:?}", finised);
 
     sender_event.send(finised).await.map_err(|_| error::Error::Unknown)?;
 
