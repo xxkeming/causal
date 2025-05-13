@@ -7,7 +7,8 @@ description = "BonsaiDB storage backend for Causal application"
 
 [dependencies]
 bonsaidb = { version = "0.5.0", features = ["local-full"] }
-chrono = { version = "0.4", features = ["serde"] }
+
+chrono = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

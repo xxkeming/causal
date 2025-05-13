@@ -251,7 +251,7 @@ pub async fn ftech(
                 document::loader_from_data_base64(convert.name, convert.data)
             {
                 tracing::info!("convert title: {:?} data: {}", title, data.len());
-                if data.len() > 0 {
+                if !data.is_empty() {
                     return Ok(serde_json::json!({
                         "status": "success",
                         "data": data,
@@ -259,7 +259,7 @@ pub async fn ftech(
                 }
             }
 
-            return Err(error::Error::InvalidData("convert failed".to_string()));
+            Err(error::Error::InvalidData("convert failed".to_string()))
         }
         _ => Err(error::Error::Unknown),
     }

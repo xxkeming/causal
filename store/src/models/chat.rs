@@ -104,7 +104,7 @@ impl ChatMessage {
             reasoning_content: None,
             content: message,
             tools: None,
-            attachments: attachments,
+            attachments,
             status: MessageStatus::Sending,
             feedback: 0,
             cost: None,
@@ -117,7 +117,7 @@ impl ChatMessage {
 
     pub fn new_assistant(id: u64, session: u64) -> Self {
         Self {
-            id: id,
+            id,
             session_id: session,
             role: Role::Assistant,
             reasoning_content: None,

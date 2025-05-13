@@ -82,19 +82,19 @@ impl McpTool {
         let client = client_info
             .serve(TokioChildProcess::new(&mut cmd)?)
             .await
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+            .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         let tools = client
             .list_tools(Default::default())
             .await
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+            .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         Ok(Self::new(client, tools))
     }
 
     pub async fn try_new_sse(url: String) -> Result<Self, error::Error> {
         let transport =
-            SseTransport::start(url).await.map_err(|e| error::Error::McpError(format!("{e}")))?;
+            SseTransport::start(url).await.map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         let client_info = ClientInfo {
             protocol_version: Default::default(),
@@ -105,15 +105,13 @@ impl McpTool {
             },
         };
 
-        let client = client_info
-            .serve(transport)
-            .await
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+        let client =
+            client_info.serve(transport).await.map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         let tools = client
             .list_tools(Default::default())
             .await
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+            .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         Ok(Self::new(client, tools))
     }
@@ -136,15 +134,11 @@ impl ToolObject for McpTool {
 
             let response = self
                 .client
-                .call_tool(CallToolRequestParam {
-                    name: name.to_string().into(),
-                    arguments: arguments,
-                })
+                .call_tool(CallToolRequestParam { name: name.to_string().into(), arguments })
                 .await
-                .map_err(|e| error::Error::McpError(format!("{e}")))?;
+                .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
-            Ok(serde_json::to_value(response)
-                .map_err(|e| error::Error::McpError(format!("{e}")))?)
+            serde_json::to_value(response).map_err(|e| error::Error::Mcp(format!("{e}")))
         })
     }
 }

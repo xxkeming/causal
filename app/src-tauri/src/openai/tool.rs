@@ -56,11 +56,9 @@ impl Tool {
 
     pub async fn into_tool_object(self) -> Result<Box<dyn ToolObject>, error::Error> {
         match self.0.data {
-            store::ToolData::McpSse(sse) => {
-                return Ok(Box::new(McpTool::try_new_sse(sse.url).await?));
-            }
+            store::ToolData::McpSse(sse) => Ok(Box::new(McpTool::try_new_sse(sse.url).await?)),
             store::ToolData::McpIo(io) => {
-                return Ok(Box::new(McpTool::try_new_io(io.command, io.args, io.env).await?));
+                Ok(Box::new(McpTool::try_new_io(io.command, io.args, io.env).await?))
             }
             _ => Err(error::Error::InvalidData("Unsupported tool type".to_string())),
         }
@@ -78,7 +76,7 @@ impl Search {
         match self.0.r#type {
             store::SearchType::Tavily { api_key } => {
                 // Taivly搜索工具
-                return Ok(Box::new(SearchTaivlyTool::try_new(api_key)?));
+                Ok(Box::new(SearchTaivlyTool::try_new(api_key)?))
             }
         }
     }

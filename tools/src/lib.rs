@@ -129,7 +129,7 @@ pub struct McpSseTool {
 impl McpSseTool {
     pub async fn try_new(url: String) -> Result<Self, error::Error> {
         let client = ClientBuilder::new(ClientSseTransportBuilder::new(url).build()).build();
-        client.open().await.map_err(|e| error::Error::McpError(format!("{e}")))?;
+        client.open().await.map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         client
             .initialize(
@@ -137,16 +137,16 @@ impl McpSseTool {
                 ClientCapabilities::default(),
             )
             .await
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+            .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         let mut response = client
             .request("tools/list", None, RequestOptions::default())
             .await
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+            .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         let tools = response.get_mut("tools").unwrap().take();
         let tools = serde_json::from_value::<Vec<ToolDescription>>(tools)
-            .map_err(|e| error::Error::McpError(format!("{e}")))?;
+            .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
         Ok(Self { client, description: tools })
     }
@@ -166,10 +166,9 @@ impl ToolObject for McpSseTool {
                 .client
                 .call_tool(name, Some(param))
                 .await
-                .map_err(|e| error::Error::McpError(format!("{e}")))?;
+                .map_err(|e| error::Error::Mcp(format!("{e}")))?;
 
-            Ok(serde_json::to_value(response)
-                .map_err(|e| error::Error::McpError(format!("{e}")))?)
+            serde_json::to_value(response).map_err(|e| error::Error::Mcp(format!("{e}")))
         })
     }
 }

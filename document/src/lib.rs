@@ -15,8 +15,7 @@ pub fn loader_from_data_base64(name: String, data: String) -> Option<(Option<Str
         return md.convert(&tmp_file, None).map(|result| (result.title, result.text_content));
     }
 
-    let mime = mime_guess2::from_path(&name).first();
-    let Some(mime) = mime else { return None };
+    let mime = mime_guess2::from_path(&name).first()?;
     let mime = mime.essence_str();
 
     // Check if the file name ends with a supported document extension
@@ -28,7 +27,7 @@ pub fn loader_from_data_base64(name: String, data: String) -> Option<(Option<Str
             .map(|text| (None, text));
     }
 
-    return None;
+    None
 }
 
 #[cfg(test)]

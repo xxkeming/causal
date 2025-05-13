@@ -17,7 +17,7 @@ async fn app_version() -> String {
 
 #[tauri::command]
 async fn app_date() -> String {
-    "2025-04-26".to_string()
+    env!("COMPILE_TIME").to_string()
 }
 
 #[tauri::command]
@@ -34,7 +34,7 @@ async fn fetch(
 async fn event(
     tasks: tauri::State<'_, api::event::MessageTasks>, store: tauri::State<'_, store::Store>,
     message: store::ChatMessage, search: bool, time: bool, stream: bool,
-    on_event: tauri::ipc::Channel<api::event::MessageEvent>,
+    on_event: tauri::ipc::Channel<openai::chat::MessageEvent>,
 ) -> Result<serde_json::Value, serde_json::Value> {
     api::event::event(tasks, store, message, search, time, stream, on_event).await.map_err(|e| {
         tracing::error!("event error: {}", e.to_string());
