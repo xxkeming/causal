@@ -3,6 +3,7 @@ mod error;
 mod openai;
 
 use tauri::Manager;
+// use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 #[tauri::command]
@@ -55,6 +56,32 @@ async fn event_exit(
     }))
 }
 
+// async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
+//     tracing::info!("checking for updates");
+
+//     // Check for updates
+//     if let Some(update) = app.updater()?.check().await? {
+//         let mut downloaded = 0;
+
+//         // alternatively we could also call update.download() and update.install() separately
+//         update
+//             .download_and_install(
+//                 |chunk_length, content_length| {
+//                     downloaded += chunk_length;
+//                     tracing::info!("downloaded {downloaded} from {content_length:?}");
+//                 },
+//                 || {
+//                     tracing::info!("download finished");
+//                 },
+//             )
+//             .await?;
+
+//         tracing::info!("update installed");
+//         app.restart();
+//     }
+//     Ok(())
+// }
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
     // 获取当前用户的目录, 拼接.causal, 如果没有则创建
@@ -80,6 +107,15 @@ pub async fn run() {
     let tasks = api::event::MessageTasks::default();
 
     tauri::Builder::default()
+        // .setup(|app| {
+        //     let handle = app.handle().clone();
+        //     tauri::async_runtime::spawn(async move {
+        //         update(handle).await.unwrap();
+        //     });
+        //     Ok(())
+        // })
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
