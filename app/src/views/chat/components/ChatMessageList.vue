@@ -315,11 +315,11 @@ const checkIfAtBottom = () => {
 // 处理滚动事件
 const handleScroll = throttle(() => {
   checkIfAtBottom();
-}, 100);
+}, 50);
 
 // 优化的滚动到底部函数
 const scrollToBottom = () => {
-  if (!scrollContainer.value) return;
+  if (!scrollContainer.value || !isAtBottom.value) return;
   
   // 使用requestAnimationFrame来优化性能
   requestAnimationFrame(() => {
@@ -396,11 +396,11 @@ function copyMessage(message: ChatMessage) {
   flex: 1;
   overflow-y: auto;
   padding: 20px 16px;
-  padding-bottom: 180px;
+  padding-bottom: 120px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: 100vh;
+  height: 93vh;
   scroll-behavior: smooth;
   align-items: center;
 }

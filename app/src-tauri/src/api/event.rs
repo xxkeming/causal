@@ -12,11 +12,11 @@ use tokio::sync::{RwLock, mpsc, watch};
 use store::ChatMessage;
 
 use crate::{
-    error,
-    openai::tool::{Search, Tool},
+    AppState, error,
     openai::{
         self,
         chat::{self, MessageEvent},
+        tool::{Search, Tool},
     },
 };
 
@@ -24,31 +24,26 @@ pub struct MessageTask {
     pub exit: tokio::sync::watch::Sender<()>,
 }
 
-pub type MessageTasks = Arc<RwLock<HashMap<u64, MessageTask>>>;
+pub type MessageTasks = RwLock<HashMap<u64, MessageTask>>;
 
 pub async fn event(
-    tasks: tauri::State<'_, MessageTasks>, store: tauri::State<'_, store::Store>,
-    message: ChatMessage, search: bool, time: bool, stream: bool,
+    app: tauri::State<'_, AppState>, message: ChatMessage, search: bool, time: bool, stream: bool,
     on_event: tauri::ipc::Channel<MessageEvent>,
 ) -> Result<serde_json::Value, error::Error> {
-    let session = store.get_chat_session(message.session_id)?.ok_or_else(|| {
+    let session = app.store.get_chat_session(message.session_id)?.ok_or_else(|| {
         error::Error::InvalidData(format!("Session with id {} not found", message.id))
     })?;
 
-    let agent = store.get_agent(session.agent_id)?.ok_or_else(|| {
-        error::Error::InvalidData(format!("Agent with id {} not found", session.agent_id))
-    })?;
+    let agent = app.get_agent(session.agent_id).await?;
 
     let Some(model) = agent.model.as_ref() else {
         return Err(error::Error::InvalidData(format!("Model with {:?} not found", agent.model)));
     };
 
-    let provider = store
-        .get_provider(model.id)?
-        .ok_or_else(|| error::Error::InvalidData(format!("Provider with {:?} not found", model)))?;
+    let provider = app.get_provider(model.id).await?;
 
     let (sender_event, mut receiver_event) = mpsc::channel::<MessageEvent>(32);
-    let task_store = (*store).clone();
+    let task_store = app.store.clone();
     tokio::spawn(async move {
         let mut assistant: Option<ChatMessage> = None;
         while let Some(event) = receiver_event.recv().await {
@@ -120,10 +115,11 @@ pub async fn event(
     });
 
     let (message, histroy) = if message.id == 0 {
-        let histroy = store
+        let histroy = app
+            .store
             .get_latest_messages_by_session(message.session_id, agent.context_size as usize * 2)?;
 
-        let message = store.add_chat_message(message)?;
+        let message = app.store.add_chat_message(message)?;
         sender_event
             .send(MessageEvent::UserMessage { message: message.clone() })
             .await
@@ -137,7 +133,7 @@ pub async fn event(
 
         (message, histroy)
     } else {
-        let mut histroy = store.get_messages_by_session_and_message(
+        let mut histroy = app.store.get_latest_messages_by_session_and_message(
             message.session_id,
             message.id + 1,
             agent.context_size as usize * 2 + 2,
@@ -171,11 +167,11 @@ pub async fn event(
     let message_id = message.id;
     let mut message = openai::Message::new_user(message)?;
 
-    let mut search = if search { Some(store.get_search()?) } else { None };
+    let mut search = if search { Some(app.store.get_search()?) } else { None };
 
     // 先联网搜索
     if let Some(search) = search.take_if(|v| v.mode == 1) {
-        let search = Search::new(search).into_tool_object()?;
+        let search = app.get_search_tool_object(search).await?;
 
         let query = json!({"query": message.content.clone()});
         let search = search.call("search", query.clone()).await?;
@@ -202,26 +198,19 @@ pub async fn event(
 
     let config = OpenAIConfig::new()
         .with_api_base(provider.url.clone())
-        .with_api_key(provider.api_key.map(|key| key.to_string()).unwrap_or_default());
+        .with_api_key(provider.api_key.as_ref().map(|key| key.to_string()).unwrap_or_default());
     let client = Client::with_config(config);
 
-    let tools = agent
-        .tools
-        .map(|id| {
-            id.iter().filter_map(|id| store.get_tool(*id).unwrap_or(None)).collect::<Vec<_>>()
-        })
-        .unwrap_or(Vec::new());
-
     let mut tool_objects = Vec::new();
-    for tool in tools.into_iter() {
-        tool_objects.push(Tool::new(tool).into_tool_object().await?);
+    for id in agent.tools.clone().into_iter().map(|tool| tool.into_iter()).flatten() {
+        tool_objects.push(app.get_tool_object(id).await?);
     }
 
     let mut tools = Vec::new();
 
     // 先联网搜索工具方式
     if let Some(search) = search.take_if(|v| v.mode == 2) {
-        tool_objects.push(Search::new(search).into_tool_object()?);
+        tool_objects.push(app.get_search_tool_object(search).await?);
     }
 
     for tool in tool_objects.iter() {
@@ -252,7 +241,7 @@ pub async fn event(
     let cost = std::time::Instant::now();
 
     let (sender_exit, mut receiver_exit) = watch::channel(());
-    tasks.write().await.insert(message_id, MessageTask { exit: sender_exit });
+    app.tasks.write().await.insert(message_id, MessageTask { exit: sender_exit });
 
     let mut event_result = Ok(serde_json::json!({
         "status": "success"
@@ -301,7 +290,7 @@ pub async fn event(
                 match result {
                     Ok((is_continue, usage)) => {
                         if !is_continue {
-                            tasks.write().await.remove(&message_id);
+                             app.tasks.write().await.remove(&message_id);
                         }
                         if let Some(usage) = usage {
                             usages.push(usage);
@@ -309,7 +298,7 @@ pub async fn event(
                         is_continue
                     },
                     Err(e) => {
-                        tasks.write().await.remove(&message_id);
+                         app.tasks.write().await.remove(&message_id);
                         event_result = Err(e);
                         false
                     }

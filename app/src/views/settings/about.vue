@@ -135,7 +135,6 @@ const techStack = [
   { name: 'Vue 3', type: 'success' as const },
   { name: 'Naive UI', type: 'success' as const },
   { name: 'Vite', type: 'warning' as const },
-  
 ];
 
 // 许可证信息

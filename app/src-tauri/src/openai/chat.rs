@@ -57,7 +57,7 @@ pub enum MessageEvent {
 }
 
 async fn call_tools(
-    tools: Arc<Vec<Box<dyn ToolObject>>>, name: String, args: String,
+    tools: Arc<Vec<Arc<Box<dyn ToolObject>>>>, name: String, args: String,
 ) -> Result<Value, error::Error> {
     tracing::info!("Calling function: {} with args: {}", name, args);
 
@@ -75,7 +75,7 @@ async fn call_tools(
 }
 
 pub async fn chat_stream(
-    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Box<dyn ToolObject>>>,
+    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Arc<Box<dyn ToolObject>>>>,
     request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
     on_event: &mpsc::Sender<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {
@@ -207,7 +207,7 @@ pub async fn chat_stream(
 }
 
 pub async fn chat(
-    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Box<dyn ToolObject>>>,
+    client: &Client<OpenAIConfig>, tool_objects: Arc<Vec<Arc<Box<dyn ToolObject>>>>,
     request: CreateChatCompletionRequest, messages: &mut Vec<ChatCompletionRequestMessage>,
     on_event: &mpsc::Sender<MessageEvent>,
 ) -> Result<(bool, Option<CompletionUsage>), error::Error> {

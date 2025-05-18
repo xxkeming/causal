@@ -2,9 +2,79 @@ mod api;
 mod error;
 mod openai;
 
+use std::{collections::HashMap, sync::Arc};
+
+use openai::tool::ToolObject;
+use store::Search;
 use tauri::Manager;
 // use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+use tokio::sync::RwLock;
+
+struct AppState {
+    causal_dir: String,
+    store: store::Store,
+    tasks: api::event::MessageTasks,
+
+    providers: RwLock<HashMap<u64, Arc<store::Provider>>>,
+    agents: RwLock<HashMap<u64, Arc<store::Agent>>>,
+    tools: RwLock<HashMap<u64, Arc<Box<dyn ToolObject>>>>,
+    search: RwLock<Option<Arc<Box<dyn ToolObject>>>>,
+}
+
+impl AppState {
+    async fn get_provider(&self, id: u64) -> Result<Arc<store::Provider>, error::Error> {
+        if let Some(provider) = self.providers.read().await.get(&id) {
+            return Ok(provider.clone());
+        }
+        let provider = self
+            .store
+            .get_provider(id)?
+            .ok_or(error::Error::InvalidData(format!("Provider with id {} not found", id)))?;
+        let provider = Arc::new(provider);
+        self.providers.write().await.insert(id, provider.clone());
+        Ok(provider)
+    }
+
+    async fn get_agent(&self, id: u64) -> Result<Arc<store::Agent>, error::Error> {
+        if let Some(agent) = self.agents.read().await.get(&id) {
+            return Ok(agent.clone());
+        }
+        let agent = self
+            .store
+            .get_agent(id)?
+            .ok_or(error::Error::InvalidData(format!("Agent with id {} not found", id)))?;
+        let agent = Arc::new(agent);
+        self.agents.write().await.insert(id, agent.clone());
+        Ok(agent)
+    }
+
+    pub async fn get_tool_object(&self, id: u64) -> Result<Arc<Box<dyn ToolObject>>, error::Error> {
+        if let Some(tool) = self.tools.read().await.get(&id) {
+            return Ok(tool.clone());
+        }
+        let tool = self
+            .store
+            .get_tool(id)?
+            .ok_or(error::Error::InvalidData(format!("Tool with id {} not found", id)))?;
+        let tool_object = openai::tool::Tool::new(tool).into_tool_object().await?;
+        let tool_object = Arc::new(tool_object);
+        self.tools.write().await.insert(id, tool_object.clone());
+        Ok(tool_object)
+    }
+
+    pub async fn get_search_tool_object(
+        &self, search: Search,
+    ) -> Result<Arc<Box<dyn ToolObject>>, error::Error> {
+        if let Some(search) = self.search.read().await.as_ref() {
+            return Ok(search.clone());
+        }
+        let search = openai::tool::Search::new(search).into_tool_object()?;
+        let search = Arc::new(search);
+        self.search.write().await.replace(search.clone());
+        Ok(search)
+    }
+}
 
 #[tauri::command]
 async fn app_name() -> String {
@@ -23,9 +93,9 @@ async fn app_date() -> String {
 
 #[tauri::command]
 async fn fetch(
-    store: tauri::State<'_, store::Store>, name: String, data: String,
+    app: tauri::State<'_, AppState>, name: String, data: String,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::fetch::ftech(store, &name, &data).await.map_err(|e| {
+    api::fetch::ftech(app, &name, &data).await.map_err(|e| {
         tracing::error!("fetch error: {}", e.to_string());
         e.into()
     })
@@ -33,11 +103,10 @@ async fn fetch(
 
 #[tauri::command]
 async fn event(
-    tasks: tauri::State<'_, api::event::MessageTasks>, store: tauri::State<'_, store::Store>,
-    message: store::ChatMessage, search: bool, time: bool, stream: bool,
-    on_event: tauri::ipc::Channel<openai::chat::MessageEvent>,
+    app: tauri::State<'_, AppState>, message: store::ChatMessage, search: bool, time: bool,
+    stream: bool, on_event: tauri::ipc::Channel<openai::chat::MessageEvent>,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    api::event::event(tasks, store, message, search, time, stream, on_event).await.map_err(|e| {
+    api::event::event(app, message, search, time, stream, on_event).await.map_err(|e| {
         tracing::error!("event error: {}", e.to_string());
         e.into()
     })
@@ -45,9 +114,9 @@ async fn event(
 
 #[tauri::command]
 async fn event_exit(
-    tasks: tauri::State<'_, api::event::MessageTasks>, message: u64,
+    app: tauri::State<'_, AppState>, message: u64,
 ) -> Result<serde_json::Value, serde_json::Value> {
-    let mut tasks = tasks.write().await;
+    let mut tasks = app.tasks.write().await;
     if let Some(task) = tasks.remove(&message) {
         let _ = task.exit.send(());
     }
@@ -100,11 +169,16 @@ pub async fn run() {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    // 打开数据库
-    let store = store::Store::open(format!("{}/store", causal_dir)).unwrap();
+    let app = AppState {
+        causal_dir: causal_dir.clone(),
+        store: store::Store::open(format!("{}/store", causal_dir)).unwrap(),
+        tasks: api::event::MessageTasks::default(),
 
-    // 任务列表
-    let tasks = api::event::MessageTasks::default();
+        providers: RwLock::new(HashMap::new()),
+        agents: RwLock::new(HashMap::new()),
+        tools: RwLock::new(HashMap::new()),
+        search: RwLock::new(None),
+    };
 
     tauri::Builder::default()
         // .setup(|app| {
@@ -126,9 +200,7 @@ pub async fn run() {
             event,
             event_exit
         ])
-        .manage(store)
-        .manage(tasks)
-        // .manage(causal_dir)
+        .manage(app)
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 let _ = window.app_handle().save_window_state(StateFlags::all());

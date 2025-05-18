@@ -239,7 +239,7 @@ impl Store {
     }
 
     /// 根据会话里面的一条消息,查找指定条数的消息
-    pub fn get_messages_by_session_and_message(
+    pub fn get_latest_messages_by_session_and_message(
         &self, session_id: u64, message_id: u64, limit: usize,
     ) -> Result<Vec<ChatMessage>, StoreError> {
         let messages = self.get_messages_by_session(session_id)?;
