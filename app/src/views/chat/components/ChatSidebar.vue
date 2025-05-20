@@ -5,42 +5,43 @@
     collapse-mode="width"
     :collapsed-width="0"
     :show-trigger="false"
-    :native-scrollbar="false"
+    :native-scrollbar="true"
+    :content-style="{ overflow: 'hidden'}"
     v-model:collapsed="collapsedValue"
     class="session-sider"
   >
-    <n-scrollbar class="session-list-scrollbar">
-      <div class="session-list">
-        <!-- 搜索区域与新建会话按钮在同一行 -->
-        <div class="sidebar-header">
-          <n-input
-            v-model:value="searchKeyword"
-            placeholder="搜索会话..."
-            clearable
-            class="session-search"
-          >
-            <template #prefix>
-              <n-icon><SearchOutline /></n-icon>
-            </template>
-          </n-input>
-          <!-- 替换新建会话按钮为带tooltip的样式 -->
-          <n-tooltip trigger="hover" placement="bottom">
-            <template #trigger>
-              <n-button
-                quaternary 
-                circle
-                class="new-session-button"
-                @click="createNewSession"
-                :style="{ backgroundColor: '#18a058', color: 'white' }"
-              >
-                <n-icon size="18"><AddOutline /></n-icon>
-              </n-button>
-            </template>
-            新建会话
-          </n-tooltip>
-        </div>
-        
-        <!-- 会话列表项 -->
+    <div class="session-list">
+      <!-- 搜索区域与新建会话按钮在同一行 -->
+      <div class="sidebar-header">
+        <n-input
+          v-model:value="searchKeyword"
+          placeholder="搜索会话..."
+          clearable
+          class="session-search"
+        >
+          <template #prefix>
+            <n-icon><SearchOutline /></n-icon>
+          </template>
+        </n-input>
+        <!-- 替换新建会话按钮为带tooltip的样式 -->
+        <n-tooltip trigger="hover" placement="bottom">
+          <template #trigger>
+            <n-button
+              quaternary 
+              circle
+              class="new-session-button"
+              @click="createNewSession"
+              :style="{ backgroundColor: '#18a058', color: 'white' }"
+            >
+              <n-icon size="18"><AddOutline /></n-icon>
+            </n-button>
+          </template>
+          新建会话
+        </n-tooltip>
+      </div>
+      
+      <!-- 会话列表项 -->
+      <n-scrollbar class="session-list-scrollbar">
         <div 
           v-for="session in filteredSessions" 
           :key="session.id" 
@@ -66,23 +67,24 @@
             <div class="session-preview">{{ session.topic }}</div>
           </div>
         </div>
+      </n-scrollbar>
 
-        <!-- 添加右键菜单 -->
-        <n-dropdown
-          :show="showDropdown"
-          :options="menuOptions"
-          :x="x"
-          :y="y"
-          placement="bottom-start"
-          @select="handleSelect"
-          @clickoutside="showDropdown = false"
-        />
-        
-        <div v-if="filteredSessions.length === 0" class="no-sessions">
-          {{ sessions.length === 0 ? '暂无会话记录' : '没有找到匹配的会话' }}
-        </div>
+      <!-- 添加右键菜单 -->
+      <n-dropdown
+        :show="showDropdown"
+        :options="menuOptions"
+        :x="x"
+        :y="y"
+        placement="bottom-start"
+        @select="handleSelect"
+        @clickoutside="showDropdown = false"
+      />
+      
+      <div v-if="filteredSessions.length === 0" class="no-sessions">
+        {{ sessions.length === 0 ? '暂无会话记录' : '没有找到匹配的会话' }}
       </div>
-    </n-scrollbar>
+    </div>
+  
     
     <!-- 修改编辑主题的模态框，参考删除确认框的样式 -->
     <n-modal 
@@ -106,6 +108,7 @@
         v-model:value="editSessionName" 
         placeholder="请输入会话主题"
         autofocus
+        @keydown.enter="updateSessionName"
         style="margin-top: 12px;"
       />
     </n-modal>
@@ -326,10 +329,14 @@ const handleSelect = (key: string) => {
 <style scoped>
 .session-list-scrollbar {
   height: 100%;
+  width: 100%;
+  /* overflow-y: auto !important; */
 }
 
 .session-list {
-  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 /* 顶部操作区域样式 - 修改为一行一个按钮 */
@@ -350,8 +357,10 @@ const handleSelect = (key: string) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
-  padding-top: 3px;
+  padding-top: 11px;
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-bottom: 8px;
 }
 
 .session-search {
@@ -400,7 +409,9 @@ const handleSelect = (key: string) => {
   align-items: center;
   padding: 4px 5px;
   border-radius: 6px;
-  margin-bottom: 1px;
+  margin-left: 4px;
+  margin-bottom: 4px;
+  margin-right: 12px;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;

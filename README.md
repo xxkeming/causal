@@ -5,6 +5,7 @@ Causal 是一个基于 Tauri 2 和 Vue 3 构建的现代化智能对话平台，
 ## 效果预览
 
 ![应用预览](/app/public/app.jpg)
+![应用预览](/app/public/tool.jpg)
 
 ## 主要功能
 

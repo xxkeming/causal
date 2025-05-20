@@ -36,6 +36,11 @@ html, body {
   overflow: visible !important;
 }
 
+/* 会话侧边栏特殊处理 - 覆盖上面的全局规则 */
+.session-sider.n-layout-sider {
+  overflow: hidden !important;
+}
+
 .n-layout-toggle-button {
   position: absolute;
   z-index: 100;

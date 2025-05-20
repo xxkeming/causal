@@ -1,5 +1,11 @@
 <template>
   <div class="chat-messages" ref="scrollContainer" @scroll="handleScroll">
+    <!-- 加载更多指示器 -->
+    <div v-if="loadingHistory" class="load-more-indicator">
+      <n-spin size="small" />
+      <span>加载更多消息...</span>
+    </div>
+    
     <!-- 消息列表 -->
     <template v-if="messages.length > 0">
       <div 
@@ -242,13 +248,18 @@ const props = defineProps({
     type: Array as () => string[],
     default: () => [],
   },
+  loadingHistory: { // 添加新属性，用于显示顶部加载状态
+    type: Boolean,
+    default: false
+  },
+  noMoreMessages: { // 添加新属性，用于标记是否还有更多历史消息
+    type: Boolean,
+    default: false
+  }
 });
 
-// 定义事件 - 添加删除事件
-defineEmits(['retry', 'send', 'delete', 'feedback']);
-
-// DOM引用
-const messagesContainer = ref<HTMLElement | null>(null);
+// 定义事件 - 添加加载更多事件
+const emit = defineEmits(['retry', 'send', 'delete', 'feedback', 'loadMore']);
 
 // 改进的消息时间格式化
 function formatDate(timestamp: number): string {
@@ -301,8 +312,12 @@ function formatCost(ms: number): string {
 
 // 添加新的响应式变量用于跟踪滚动状态
 const isAtBottom = ref(true);
+const isAtTop = ref(false); // 新增状态，表示是否滚动到顶部
 const scrollThreshold = 100; // 距离底部多少像素内认为在底部
+const scrollTopThreshold = 160; // 距离顶部多少像素内认为在顶部
 const scrollContainer = ref<HTMLDivElement | null>(null);
+const lastScrollHeight = ref(0); // 记录上次滚动高度，用于保持滚动位置
+const lastScrollTop = ref(0); // 记录上次滚动位置
 
 // 检查是否在底部的函数
 const checkIfAtBottom = () => {
@@ -312,10 +327,45 @@ const checkIfAtBottom = () => {
   isAtBottom.value = scrollHeight - scrollTop - clientHeight < scrollThreshold;
 };
 
+// 检查是否在顶部的函数
+const checkIfAtTop = () => {
+  if (!scrollContainer.value) return;
+  
+  const { scrollTop } = scrollContainer.value;
+  isAtTop.value = scrollTop < scrollTopThreshold;
+};
+
 // 处理滚动事件
 const handleScroll = throttle(() => {
   checkIfAtBottom();
-}, 50);
+  checkIfAtTop();
+  
+  // 如果滚动到顶部且没有正在加载，触发加载更多事件
+  if (isAtTop.value && !props.loadingHistory && !props.noMoreMessages) {
+    // 设置一个短暂的延迟，确保我们真的处于顶部而不是快速滚动
+    setTimeout(() => {
+      // 再次检查是否真的在顶部，防止快速滚动导致的误判
+      checkIfAtTop();
+      
+      if (isAtTop.value && !props.loadingHistory) {
+        // 在加载前先准确记录容器高度和滚动位置
+        if (scrollContainer.value) {
+          // 保存当前的滚动位置信息
+          lastScrollHeight.value = scrollContainer.value.scrollHeight;
+          lastScrollTop.value = scrollContainer.value.scrollTop;
+          
+          // 记录当前第一条消息的引用，以便在DOM变化后找到它
+          const firstMessage = document.querySelector('.message-item');
+          if (firstMessage) {
+            firstMessage.setAttribute('data-first-visible', 'true');
+          }
+        }
+        
+        emit('loadMore', props.messages[0]?.id - 1); // 发送最早消息的ID
+      }
+    }, 100);
+  }
+}, 80);
 
 // 优化的滚动到底部函数
 const scrollToBottom = () => {
@@ -329,22 +379,90 @@ const scrollToBottom = () => {
   });
 };
 
+// 维持滚动位置的函数
+const maintainScrollPosition = () => {
+  if (!scrollContainer.value || lastScrollHeight.value === 0) return;
+  
+  // 设置一个标志，防止其他滚动操作干扰
+  const isAdjustingScroll = ref(true);
+  
+  // 我们需要多次尝试维持滚动位置，因为DOM可能在多个微任务/宏任务循环后才完全渲染
+  const tryToAdjustScroll = (attempts = 0, maxAttempts = 8) => {
+    if (attempts >= maxAttempts || !scrollContainer.value) {
+      isAdjustingScroll.value = false;
+      return;
+    }
+    
+    const currentHeight = scrollContainer.value.scrollHeight;
+    const heightDiff = currentHeight - lastScrollHeight.value;
+    
+    // 只在高度真正发生变化时调整滚动位置
+    if (heightDiff > 0) {
+      // 暂停平滑滚动效果，使位置调整立即生效
+      scrollContainer.value.style.scrollBehavior = 'auto';
+      
+      // 计算新的滚动位置
+      const newScrollTop = lastScrollTop.value + heightDiff;
+      
+      // 应用新的滚动位置
+      scrollContainer.value.scrollTop = newScrollTop;
+      
+      // 延长恢复平滑滚动效果的时间，确保调整完成
+      setTimeout(() => {
+        if (scrollContainer.value) {
+          scrollContainer.value.style.scrollBehavior = 'smooth';
+          isAdjustingScroll.value = false;
+        }
+      }, 200);
+      
+      // 重置记录
+      lastScrollHeight.value = 0;
+      lastScrollTop.value = 0;
+    } else {
+      // 如果高度没有变化，可能DOM渲染尚未完成，延迟再试
+      // 增加延迟时间，给DOM渲染更多时间
+      setTimeout(() => tryToAdjustScroll(attempts + 1, maxAttempts), 80);
+    }
+  };
+  
+  // 立即尝试一次
+  tryToAdjustScroll();
+  
+  // 返回是否正在调整滚动位置的状态
+  return isAdjustingScroll.value;
+};
+
 // 监听消息列表变化
 watch(() => props.messages, (newMessages, oldMessages) => {
   // 如果消息列表为空，无需滚动
   if (!newMessages || newMessages.length === 0) return;
   
-  // 只有在以下情况才滚动:
-  // 1. 用户已经在查看底部（isAtBottom为true）
-  // 2. 或者是有新消息添加（消息数量变多）
-  const hasNewMessage = !oldMessages || newMessages.length > oldMessages.length;
-
-  if (isAtBottom.value || hasNewMessage) {
-    // 使用nextTick确保DOM已更新
+  // 如果是加载历史消息（消息增加且第一条消息ID更小）
+  const isLoadingHistory = oldMessages && 
+                          newMessages.length > (oldMessages?.length || 0) && 
+                          newMessages[0]?.id < (oldMessages?.[0]?.id || Infinity);
+  
+  if (isLoadingHistory) {
+    // 维持滚动位置，使用两次nextTick确保DOM完全更新
+    nextTick(() => {
+      nextTick(() => {
+        maintainScrollPosition();
+      });
+    });
+  } else if (
+    // 新消息添加且用户在底部
+    (isAtBottom.value && oldMessages && newMessages.length > oldMessages.length) || 
+    // 或者是初始加载
+    !oldMessages ||
+    // 或者是用户发送了新消息（消息ID更大）
+    (oldMessages && newMessages.length > oldMessages.length && 
+     newMessages[newMessages.length - 1]?.id > (oldMessages[oldMessages.length - 1]?.id || 0))
+  ) {
     nextTick(() => {
       scrollToBottom();
     });
   }
+  // 其他情况保持当前滚动位置
 }, { immediate: true, deep: true });
 
 // 监听agentIcon变化，强制重新渲染
@@ -357,12 +475,30 @@ watch(() => props.agentIcon, () => {
 
 // 组件挂载后设置MutationObserver监听DOM变化
 onMounted(() => {
-  if (messagesContainer.value) {
+  // 确保scrollContainer引用与模板中的一致
+  scrollContainer.value = document.querySelector('.chat-messages') as HTMLDivElement;
+  
+  if (scrollContainer.value) {
+    // 初始化时设置平滑滚动
+    scrollContainer.value.style.scrollBehavior = 'smooth';
+    
+    // 标记是否正在加载历史消息
+    const isLoadingHistoryMessages = ref(false);
+    
+    // 设置MutationObserver监听DOM变化
     const observer = new MutationObserver(() => {
-      scrollToBottom();
+      // 只有在用户已经在底部，且不是在加载历史消息时才自动滚动
+      if (isAtBottom.value && !isLoadingHistoryMessages.value && !props.loadingHistory) {
+        scrollToBottom();
+      }
     });
     
-    observer.observe(messagesContainer.value, {
+    // 监听loadingHistory变化
+    watch(() => props.loadingHistory, (newValue) => {
+      isLoadingHistoryMessages.value = newValue;
+    });
+    
+    observer.observe(scrollContainer.value, {
       childList: true,
       subtree: true,
       characterData: true,
@@ -402,7 +538,30 @@ function copyMessage(message: ChatMessage) {
   gap: 20px;
   height: 93vh;
   scroll-behavior: smooth;
+  scrollbar-width: thin; /* Firefox */
+  -webkit-overflow-scrolling: touch; /* 为iOS添加惯性滚动 */
+  overscroll-behavior-y: contain; /* 防止过度滚动影响父容器 */
+  will-change: scroll-position; /* 提示浏览器滚动位置将发生变化 */
   align-items: center;
+}
+
+/* 加载更多指示器样式 */
+.load-more-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  color: var(--n-text-color-3);
+  font-size: 0.9em;
+  margin-bottom: 8px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+  width: 200px;
+  align-self: center;
+}
+
+.load-more-indicator span {
+  margin-left: 8px;
 }
 
 /* 消息项样式 */

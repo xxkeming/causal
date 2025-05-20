@@ -36,11 +36,14 @@
             :agent-description="agent?.description"
             :agent-icon="agentIcon"
             :loading="globalStore.isLoading"
+            :loading-history="loadingHistory"
+            :no-more-messages="noMoreMessages"
             :suggested-prompts="customQuestions"
             @retry="retryMessage"
             @delete="deleteMessage"
             @send="sendMessage"
             @feedback="handleFeedback"
+            @load-more="loadMoreMessages"
           />
 
           <!-- 使用拆分出的输入组件 -->
@@ -162,6 +165,8 @@ const search = ref(false); // 添加联网搜索状态
 const time = ref(false); // 添加附件时间状态
 const providerConfigVisible = ref(false); // 添加状态
 const currentProvider = ref<Provider | undefined>(undefined); // 添加状态
+const loadingHistory = ref(false); // 添加历史消息加载状态
+const noMoreMessages = ref(false); // 添加是否没有更多历史消息的状态
 
 // 计算属性
 const hasActiveSession = computed(() => 
@@ -186,12 +191,49 @@ async function loadSessionMessages(sessionId: number) {
   try {
     globalStore.setLoadingState(true);
     // 使用API获取会话消息而不是本地存储
-    messages.value = await api.getMessagesBySession(sessionId);
+    messages.value = await api.getMessagesBySession(sessionId, 10);
+
+    if (messages.value.length < 10) {
+      noMoreMessages.value = true; // 如果消息少于10条，标记为没有更多消息
+    }
+    
   } catch (error) {
     console.error('加载会话消息失败:', error);
     messages.value = [];
   } finally {
     globalStore.setLoadingState(false);
+  }
+}
+
+// 加载更多历史消息
+async function loadMoreMessages(oldestMessageId: number) {
+  if (!currentSessionId.value || loadingHistory.value) return;
+  
+  try {
+    loadingHistory.value = true;
+    
+    // 获取更早的消息
+    const olderMessages = await api.getMessagesBySession(
+      currentSessionId.value, 
+      6, // 每次加载10条
+      oldestMessageId // 提供最早的消息ID作为参考点
+    );
+    
+    // 如果没有更多消息，标记为没有更多历史消息
+    if (olderMessages.length !== 6) {
+      noMoreMessages.value = true;
+      message.info('没有更多历史消息了');
+      return;
+    }
+    
+    // 合并新消息到现有消息列表前面（保持时间正序）
+    messages.value = [...olderMessages, ...messages.value];
+    
+  } catch (error) {
+    console.error('加载更多消息失败:', error);
+    message.error('加载更多消息失败');
+  } finally {
+    loadingHistory.value = false;
   }
 }
 
@@ -513,6 +555,9 @@ async function switchSession(sessionId: number) {
     time.value = session.input.time;
     search.value = session.input.search;
     stream.value = session.input.stream;
+    
+    // 重置没有更多消息的标志
+    noMoreMessages.value = false;
 
     // 加载会话相关数据
     await loadSessionMessages(sessionId);
@@ -520,8 +565,11 @@ async function switchSession(sessionId: number) {
     // 加载智能体信息 - 添加此调用
     await loadAgentInfo();
     
+    // 消息滚动条调整到最下面
+    scrollToBottom();
+    
     // 强制刷新侧边栏
-    forceUpdate.value += 1;
+    // forceUpdate.value += 1;
 
     // 自动折叠侧边栏，为聊天内容提供更多空间
     // siderCollapsed.value = true;
@@ -681,6 +729,9 @@ async function createSessionWithAgent(selectedAgent: Agent) {
       minute: 'numeric'
     });
     const sessionTitle = `与${selectedAgent.name}的对话 (${timestamp})`;
+    
+    // 重置没有更多消息的标志
+    noMoreMessages.value = false;
     
     // 创建新会话
     const session = await chatSessionStore.createNewSession(selectedAgent.id, sessionTitle);

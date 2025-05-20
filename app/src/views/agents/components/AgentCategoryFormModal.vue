@@ -24,6 +24,7 @@
       placeholder="请输入分类名称" 
       autofocus
       style="margin-top: 12px;"
+      @keydown.enter="handleSubmit"
       :status="showError && !formValue.name.trim() ? 'error' : undefined"
     />
     <div v-if="showError && !formValue.name.trim()" class="error-text">

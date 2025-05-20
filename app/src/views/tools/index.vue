@@ -349,7 +349,7 @@ const createOptions: DropdownOption[] = [
     disabled: false
   },
   {
-    label: 'MCP-IO',
+    label: 'MCP-STDIO',
     key: 'mcp-io',
     icon: renderIcon(ExtensionPuzzleOutline),
     disabled: false
@@ -423,7 +423,7 @@ function getTypeDisplay(type: string): string {
     case 'js':
       return 'JavsScript';
     case 'mcpIo':
-      return 'MCP-IO';
+      return 'MCP-STDIO';
     case 'mcpSse':
       return 'MCP-SSE';
     default:

@@ -195,7 +195,6 @@ const mockKnowledgeBaseCategories: KnowledgeBaseCategory[] = [
 // 知识库API
 // 获取所有知识库
 export async function getAllKnowledgeBases(): Promise<KnowledgeBase[]> {
-  
   return [...mockKnowledgeBases]; // 返回副本以避免引用问题
 }
 
@@ -225,9 +224,8 @@ export async function addKnowledgeBase(knowledgeBaseData: Omit<KnowledgeBase, 'i
     ...knowledgeBaseData,
     createdAt: now
   };
-  
+
   mockKnowledgeBases.push(newKnowledgeBase);
-  
   return { ...newKnowledgeBase };
 }
 
@@ -247,7 +245,6 @@ export async function updateKnowledgeBase(knowledgeBaseData: KnowledgeBase): Pro
   };
   
   mockKnowledgeBases[index] = updatedKnowledgeBase;
-  
   return { ...updatedKnowledgeBase };
 }
 
@@ -259,7 +256,6 @@ export async function deleteKnowledgeBase(id: string): Promise<boolean> {
     mockKnowledgeBases.splice(index, 1);
     return true;
   }
-  
   return false;
 }
 
@@ -359,8 +355,8 @@ export async function deleteMessage(id: number): Promise<boolean> {
 }
 
 // 通过会话id获取聊天消息
-export async function getMessagesBySession(sessionId: number): Promise<ChatMessage[]> {
-  return tauriApi.fetch_local('chat.message.list.by.session', sessionId) as Promise<ChatMessage[]>;
+export async function getMessagesBySession(sessionId: number, limit: number, messageId?: number): Promise<ChatMessage[]> {
+  return tauriApi.fetch_local('chat.message.list.by.session', { session: sessionId, message: messageId, limit: limit}) as Promise<ChatMessage[]>;
 }
 
 // 通过会话id删除聊天消息
