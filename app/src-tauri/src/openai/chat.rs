@@ -95,7 +95,21 @@ pub async fn chat_stream(
         // tracing::info!("response: {:?}", response.usage);
 
         for chat_choice in response.choices {
-            // tracing::info!("reasoning_content: {:?}", chat_choice.delta.reasoning_content);
+            // tracing::info!("chat_choice: {:?}", chat_choice);
+
+            if let Some(content) = chat_choice.delta.reasoning_content.filter(|v| !v.is_empty()) {
+                on_event
+                    .send(MessageEvent::ReasoningContent { content })
+                    .await
+                    .map_err(|e| error::Error::InvalidData(e.to_string()))?;
+            }
+
+            if let Some(content) = chat_choice.delta.content.filter(|v| !v.is_empty()) {
+                on_event
+                    .send(MessageEvent::Content { content })
+                    .await
+                    .map_err(|e| error::Error::InvalidData(e.to_string()))?;
+            }
 
             if let Some(tool_calls) = chat_choice.delta.tool_calls {
                 for tool_call_chunk in tool_calls.into_iter() {
@@ -186,20 +200,6 @@ pub async fn chat_stream(
                     return Ok((true, response.usage));
                 }
             }
-
-            if let Some(content) = chat_choice.delta.reasoning_content.filter(|v| !v.is_empty()) {
-                on_event
-                    .send(MessageEvent::ReasoningContent { content })
-                    .await
-                    .map_err(|e| error::Error::InvalidData(e.to_string()))?;
-            }
-
-            if let Some(content) = chat_choice.delta.content.filter(|v| !v.is_empty()) {
-                on_event
-                    .send(MessageEvent::Content { content })
-                    .await
-                    .map_err(|e| error::Error::InvalidData(e.to_string()))?;
-            }
         }
     }
 
@@ -218,6 +218,20 @@ pub async fn chat(
     // tracing::info!("response: {:?}", response.usage);
 
     for choice in response.choices {
+        if let Some(content) = choice.message.reasoning_content {
+            on_event
+                .send(MessageEvent::ReasoningContent { content })
+                .await
+                .map_err(|e| error::Error::InvalidData(e.to_string()))?;
+        }
+
+        if let Some(content) = choice.message.content {
+            on_event
+                .send(MessageEvent::Content { content })
+                .await
+                .map_err(|e| error::Error::InvalidData(e.to_string()))?;
+        }
+
         if let Some(tool_calls) = choice.message.tool_calls {
             let mut sets = JoinSet::new();
 
@@ -259,20 +273,6 @@ pub async fn chat(
                 messages.push(tool_message);
             }
             return Ok((true, response.usage));
-        }
-
-        if let Some(content) = choice.message.reasoning_content {
-            on_event
-                .send(MessageEvent::ReasoningContent { content })
-                .await
-                .map_err(|e| error::Error::InvalidData(e.to_string()))?;
-        }
-
-        if let Some(content) = choice.message.content {
-            on_event
-                .send(MessageEvent::Content { content })
-                .await
-                .map_err(|e| error::Error::InvalidData(e.to_string()))?;
         }
     }
 

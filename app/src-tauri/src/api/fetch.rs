@@ -240,8 +240,18 @@ pub async fn ftech(
             Ok(serde_json::json!({ "status": "success" }))
         }
         "chat.message.list.by.session" => {
-            let id: u64 = serde_json::from_str(data)?;
-            let list = app.store.get_messages_by_session(id)?;
+            #[derive(serde::Deserialize)]
+            struct Options {
+                session: u64,
+                message: Option<u64>,
+                limit: usize,
+            }
+            let opt: Options = serde_json::from_str(data)?;
+            let list = app.store.get_latest_messages_by_session_and_message(
+                opt.session,
+                opt.message.unwrap_or(u64::MAX),
+                opt.limit,
+            )?;
             let parsed_data: serde_json::Value = serde_json::to_value(list)?;
             Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
