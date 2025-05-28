@@ -3,7 +3,7 @@
     <div class="scrollable-container">
       <div class="content-section">
         <div class="header-section">
-          <h2>搜索配置</h2>
+          <h2>系统配置</h2>
         </div>
 
         <n-divider />
@@ -11,16 +11,16 @@
         <div class="form-section">
           <n-form
             ref="formRef"
-            :model="searchConfig"
+            :model="settings"
             :rules="rules"
             label-placement="left"
             label-width="120"
             require-mark-placement="right-hanging"
             class="config-form"
           >
-            <n-form-item label="搜索服务" path="type.name">
+            <n-form-item label="搜索服务" path="search.type.name">
               <n-select
-                v-model:value="searchConfig.type.name"
+                v-model:value="settings.search.type.name"
                 :options="searchServiceOptions"
                 placeholder="请选择搜索服务"
                 @update:value="handleServiceChange"
@@ -28,18 +28,18 @@
               />
             </n-form-item>
 
-            <n-form-item label="搜索服务密钥" path="type.apiKey">
+            <n-form-item label="搜索服务密钥" path="search.type.apiKey">
               <n-input
-                v-model:value="searchConfig.type.apiKey"
-                :placeholder="`请输入${getServiceLabel(searchConfig.type.name)} API Key`"
+                v-model:value="settings.search.type.apiKey"
+                :placeholder="`请输入${getServiceLabel(settings.search.type.name)} API Key`"
                 type="password"
                 show-password-on="click"
                 class="large-input"
               />
             </n-form-item>
 
-            <n-form-item label="搜索模式" path="mode">
-              <n-radio-group v-model:value="searchConfig.mode" class="radio-group">
+            <n-form-item label="搜索模式" path="search.mode">
+              <n-radio-group v-model:value="settings.search.mode" class="radio-group">
                 <n-space>
                   <n-radio :value="1">先搜索</n-radio>
                   <n-radio :value="2">工具-智能搜索</n-radio>
@@ -47,13 +47,26 @@
               </n-radio-group>
             </n-form-item>
 
-            <n-form-item label="结果数量" path="resultCount">
+            <n-form-item label="结果数量" path="search.resultCount">
               <n-input-number
-                v-model:value="searchConfig.resultCount"
+                v-model:value="settings.search.resultCount"
                 :min="1"
                 :max="10"
                 placeholder="保留搜索结果数量"
                 class="small-input"
+              />
+            </n-form-item>
+
+            <n-divider />
+            
+            <n-form-item label="语音识别" path="transcriptions">
+              <ModelSelector
+                v-model="transcriptionModelValue"
+                :default-tags="['语音识别']"
+                :show-tag-filter="false"
+                size="small"
+                class="model-selector-short"
+                @change="onModelChange"
               />
             </n-form-item>
           </n-form>
@@ -82,9 +95,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { NButton, NDivider, NForm, NFormItem, NInput, NInputNumber, NRadioGroup, NRadio, NSpace, NSelect, useMessage } from 'naive-ui'
-import { getSearch, setSearch } from '../../services/api'
-import type { Search } from '../../services/typings'
+import { getSettings, setSettings } from '../../services/api'
+import type { Settings, Search } from '../../services/typings'
 import type { FormRules } from 'naive-ui'
+import ModelSelector from '../../components/ModelSelector.vue'
 
 const message = useMessage()
 const saving = ref(false)
@@ -94,41 +108,41 @@ const searchServiceOptions = [
     label: 'Tavily搜索',
     value: 'Tavily' as const
   },
-//   {
-//     label: '百度搜索',
-//     value: 'Baidu' as const
-//   }
 ]
 
-// 符合Search类型定义的默认配置
-const searchConfig = ref<Search>({
-  type: {
-    name: 'Tavily',
-    apiKey: ''
-  },
+const defaultSearch: Search = {
+  type: { name: 'Tavily', apiKey: '' },
   mode: 1,
   resultCount: 5
+}
+
+const settings = ref<Settings>({
+  search: { ...defaultSearch },
+  transcriptions: undefined
 })
 
+// 新增：用于 ModelSelector 绑定的字符串值
+const transcriptionModelValue = ref<string | undefined>(undefined)
+
 const rules: FormRules = {
-  'type.name': {
-    required: true,
+  'search.type.name': {
+    required: false,
     trigger: ['blur', 'change'],
     message: '请选择搜索服务'
   },
-  'type.apiKey': {
-    required: true,
+  'search.type.apiKey': {
+    required: false,
     trigger: ['blur', 'change'],
     message: '请输入API Key'
   },
-  mode: {
-    required: true,
+  'search.mode': {
+    required: false,
     trigger: ['blur', 'change'],
     type: 'number',
     message: '请选择搜索模式'
   },
-  resultCount: {
-    required: true,
+  'search.resultCount': {
+    required: false,
     trigger: ['blur', 'change'],
     type: 'number',
     message: '请设置结果数量'
@@ -139,8 +153,9 @@ const formRef = ref<any>(null)
 
 onMounted(async () => {
   try {
-    const config = await getSearch()
-    searchConfig.value = config
+    const config = await getSettings()
+    settings.value = config
+    transcriptionModelValue.value = config.transcriptions ? `${config.transcriptions.id}|${config.transcriptions.name}` : undefined;
   } catch (error) {
     console.error('加载配置失败')
   }
@@ -150,7 +165,7 @@ const saveConfig = async () => {
   try {
     await formRef.value?.validate()
     saving.value = true
-    await setSearch(searchConfig.value)
+    await setSettings(settings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')
@@ -159,27 +174,29 @@ const saveConfig = async () => {
   }
 }
 
-// 获取搜索服务显示名称
 const getServiceLabel = (name: 'Tavily' | 'Baidu') => {
   return searchServiceOptions.find(option => option.value === name)?.label || name
 }
 
-// 处理搜索服务切换
 const handleServiceChange = (name: 'Tavily' | 'Baidu') => {
-  searchConfig.value.type = {
-    name,
-    apiKey: ''
+  if (name === 'Tavily') {
+    settings.value.search.type = { name: 'Tavily', apiKey: '' }
+  } else if (name === 'Baidu') {
+    settings.value.search.type = { name: 'Baidu', apiKey: '' }
   }
 }
 
+// 移除对 transcriptionModelValue 的 watch，只保留 onModelChange 方法
+const onModelChange = (val: any) => {
+  settings.value.transcriptions = {id: Number(val.providerId), name: val.modelName};
+  transcriptionModelValue.value = val ? `${val.providerId}|${val.modelName}` : undefined;
+}
+
+// 保证下列方法在 <script setup> 下可用
 const resetConfig = () => {
-  searchConfig.value = {
-    type: {
-      name: 'Tavily',
-      apiKey: ''
-    },
-    mode: 1,
-    resultCount: 5
+  settings.value = {
+    search: { ...defaultSearch },
+    transcriptions: undefined
   }
 }
 </script>
@@ -273,5 +290,9 @@ const resetConfig = () => {
   display: flex;
   gap: 12px;
   justify-content: flex-start;
+}
+
+.model-selector-short {
+  width: 450px;
 }
 </style>

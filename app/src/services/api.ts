@@ -3,7 +3,7 @@ import { mockKnowledgeBases } from './mock/knowledgeData';
 import { KnowledgeBase, KnowledgeBaseCategory } from './typings';
 import { ChatSession, ChatMessage } from './typings';
 import { Provider } from './typings';
-import { Search } from './typings';
+import { Settings } from './typings';
 import { ToolMcpIo } from './typings';
 
 // 导入Tauri API
@@ -364,6 +364,11 @@ export async function deleteMessagesBySession(sessionId: number): Promise<boolea
   return tauriApi.fetch_local('chat.message.delete.by.session', sessionId) as Promise<boolean>;
 }
 
+// 语音转文字
+export async function transcriptionsAudioMessage(audioData: string): Promise<string> {
+  return tauriApi.fetch_local('chat.message.audio.transcriptions', audioData) as Promise<string>;
+}
+
 // 模拟流式输出的聊天接口（逐字输出，间隔10毫秒）
 export async function chatEvent(message: ChatMessage, search: boolean, time: boolean, stream: boolean, onData: (chunk: tauriApi.MessageEvent) => void) {
   return tauriApi.event_local(message, time, search, stream, onData);
@@ -378,13 +383,14 @@ export async function convertFile(name: string, data: string): Promise<string> {
 }
 
 // 获取搜索配置
-export async function getSearch(): Promise<Search> {
-  return tauriApi.fetch_local('search.get', null) as Promise<Search>;
+export async function getSettings(): Promise<Settings> {
+  return tauriApi.fetch_local('settings.get', null) as Promise<Settings>;
 }
 
 // 设置搜索配置
-export async function setSearch(search: Search): Promise<boolean> {
-  return tauriApi.fetch_local('search.set', search) as Promise<boolean>;
+export async function setSettings(settings: Settings): Promise<boolean> {
+  console.log('Setting new settings:', settings);
+  return tauriApi.fetch_local('settings.set', settings) as Promise<boolean>;
 }
 
 export async function appName(): Promise<string> {

@@ -6,6 +6,9 @@ pub enum Error {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    #[error("Deserialization base64 error: {0}")]
+    Base64(#[from] base64::DecodeError),
+
     #[error("Invalid data: {0}")]
     InvalidData(String),
 

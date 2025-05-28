@@ -52,9 +52,9 @@ const routes = [
         component: () => import('../views/settings/model.vue')
       },
       {
-        path: 'settings/search',
-        name: 'settingSearch',
-        component: () => import('../views/settings/search.vue')
+        path: 'settings/settings',
+        name: 'settingSettings',
+        component: () => import('../views/settings/settings.vue')
       },
       {
         path: 'settings/about',

@@ -5,17 +5,18 @@
     @drop.prevent.stop="handleDrop"
     :class="{ 'dragging': isDragging }">
     
-    <div class="chat-input-wrapper">
+    <div class="chat-input-wrapper" :class="{ 'recording-animation': isRecording }">
       <n-input
         v-model:value="inputMessage"
         type="textarea"
-        placeholder="输入消息，按Enter发送，Shift+Enter换行..."
         :autosize="{ minRows: 1, maxRows: 20 }"
         class="chat-input"
         @keydown="handleKeyDown"
         :show-count="false"
         :spellcheck="false"
         :autocomplete="false"
+        :readonly="isRecording"
+        :placeholder="isRecording ? '正在录音中，请说话...' : '输入消息，按Enter发送，Shift+Enter换行...'"
       />
       
       <div class="input-toolbar">
@@ -113,6 +114,25 @@
             {{ props.stream ? '流式输出已开启' : '流式输出已关闭' }}
           </n-tooltip>
           
+          <!-- 语音录入按钮 -->
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button 
+                class="tool-button" 
+                text 
+                :class="{ 'recording-active': isRecording }"
+                @click="toggleRecording"
+              >
+                <template #icon>
+                  <n-icon>
+                    <component :is="isRecording ? MicSharp : MicOutline" />
+                  </n-icon>
+                </template>
+              </n-button>
+            </template>
+            {{ isRecording ? '正在录音...' : '语音输入' }}
+          </n-tooltip>
+          
           <n-button 
             class="tool-button" 
             text
@@ -144,11 +164,13 @@ import {
   FlashOffOutline, // 添加非流式输出图标
   Globe,    // 修改为正确的图标名称
   GlobeOutline, // 修改为正确的离线模式图标
-  TimeOutline // 添加时间图标
+  TimeOutline, // 添加时间图标
+  MicOutline, // 添加麦克风图标
+  MicSharp // 添加激活状态麦克风图标
 } from '@vicons/ionicons5';
 import { useFileIconStore } from '../../../stores/fileIconStore'; // 导入文件图标存储
 import { Attachment } from '../../../services/typings';
-import { convertFile } from '../../../services/api';
+import { convertFile, transcriptionsAudioMessage } from '../../../services/api';
 
 const props = defineProps<{
   stream?: boolean; // 添加stream属性
@@ -172,6 +194,7 @@ const selectedFiles = ref<File[]>([]);
 const selectedAttachments = ref<Attachment[]>([]);
 const message = useMessage();
 const isDragging = ref(false);
+const isRecording = ref(false); // 录音状态
 
 // 获取文件图标存储
 const fileIconStore = useFileIconStore();
@@ -331,6 +354,92 @@ function handleSendOrStop() {
     emit('sendExit');
   } else {
     sendMessage();
+  }
+}
+
+// 切换录音状态
+function toggleRecording() {
+  if (!isRecording.value) {
+    // 开始录音
+    startRecording();
+  } else {
+    // 停止录音
+    stopRecording();
+  }
+  isRecording.value = !isRecording.value;
+}
+
+// 开始录音
+async function startRecording() {
+  try {
+    // 设置全局加载状态为录音中
+    globalStore.setLoadingState(true);
+    
+    // 请求麦克风权限
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    let audioChunks: BlobPart[] = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+      audioChunks = [];
+
+      // 处理音频文件（如上传或转录）
+      await handleAudioFile(audioBlob);
+      
+      // 完成录音和处理后，重置全局加载状态
+      globalStore.setLoadingState(false);
+    };
+
+    mediaRecorder.start();
+    globalStore.setMediaRecorder(mediaRecorder);
+  } catch (error) {
+    console.error('录音失败:', error);
+    message.error('录音失败，请检查麦克风设置');
+    isRecording.value = false;
+    // 错误情况下也需要重置全局加载状态
+    globalStore.setLoadingState(false);
+  }
+}
+
+// 停止录音
+function stopRecording() {
+  const mediaRecorder = globalStore.getMediaRecorder();
+  if (mediaRecorder) {
+    mediaRecorder.stop();
+    globalStore.setMediaRecorder(null);
+  }
+}
+
+// 处理音频文件
+async function handleAudioFile(audioBlob: Blob) {
+  try {
+    // 将音频Blob转换为base64字符串
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve, reject) => {
+      reader.onload = () => {
+        const base64String = (reader.result as string).split(',')[1]; // 获取base64部分
+        resolve(base64String);
+      };
+      reader.onerror = () => reject(new Error('读取音频文件失败'));
+      reader.readAsDataURL(audioBlob);
+    });
+
+    const base64Data = await base64Promise;
+    // 调用转录接口
+    const transcript = await transcriptionsAudioMessage(base64Data);
+    
+    // 将转录结果插入到输入框
+    if (transcript.length > 0) {
+      inputMessage.value += transcript;
+    }
+  } catch (error) {
+    console.error('音频处理失败:', error);
+    message.error('音频处理失败,请检查相关系统配置,或者重试(' + JSON.stringify(error) + ')');
   }
 }
 
@@ -634,6 +743,34 @@ onMounted(() => {
 
 .drop-zone.dragging .chat-input-wrapper {
   border: 2px dashed var(--primary-color);
+}
+
+/* 录音按钮激活状态样式 */
+.recording-active {
+  color: var(--primary-color) !important;
+}
+
+.recording-inactive {
+  color: #999 !important;
+}
+
+/* 录音中的输入框动画效果 */
+@keyframes recording-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 0, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+  }
+}
+
+.recording-animation {
+  animation: recording-pulse 2s infinite;
+  border: 1px solid rgba(255, 0, 0, 0.3) !important;
+  transition: all 0.3s ease;
 }
 
 </style>
