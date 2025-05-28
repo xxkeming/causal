@@ -1,3 +1,5 @@
+use base64::prelude::*;
+
 use crate::openai::tool::{McpTool, ToolObject};
 use crate::{AppState, error};
 
@@ -39,16 +41,16 @@ pub async fn ftech(
             let parsed_data: serde_json::Value = serde_json::to_value(list)?;
             Ok(serde_json::json!({ "status": "success", "data": parsed_data }))
         }
-        "search.set" => {
-            let search: store::Search = serde_json::from_str(data)?;
+        "settings.set" => {
+            let settings: store::Settings = serde_json::from_str(data)?;
             let _ = app.search.write().await.take();
-            app.store.set_search(search)?;
+            app.store.set_settings(settings)?;
             Ok(serde_json::json!({ "status": "success" }))
         }
-        "search.get" => {
-            let search = app.store.get_search()?;
-            let search: serde_json::Value = serde_json::to_value(search)?;
-            Ok(serde_json::json!({ "status": "success", "data": search }))
+        "settings.get" => {
+            let settings = app.store.get_settings()?;
+            let settings: serde_json::Value = serde_json::to_value(settings)?;
+            Ok(serde_json::json!({ "status": "success", "data": settings }))
         }
         "agent.add" => {
             let agent: store::Agent = serde_json::from_str(data)?;
@@ -259,6 +261,34 @@ pub async fn ftech(
             let id: u64 = serde_json::from_str(data)?;
             app.store.delete_messages_by_session(id)?;
             Ok(serde_json::json!({ "status": "success" }))
+        }
+        "chat.message.audio.transcriptions" => {
+            let audio = serde_json::from_str::<String>(data)?;
+            let audio = BASE64_STANDARD.decode(audio)?;
+
+            let settings = app.store.get_settings()?;
+            let model = settings.transcriptions.ok_or(error::Error::InvalidData(
+                "Transcriptions settings not found".to_string(),
+            ))?;
+            let provider = app
+                .store
+                .get_provider(model.id)?
+                .ok_or(error::Error::InvalidData("Provider not found".to_string()))?;
+
+            let config = async_openai::config::OpenAIConfig::new()
+                .with_api_base(provider.url)
+                .with_api_key(provider.api_key.clone().unwrap_or_default());
+            let client = async_openai::Client::with_config(config);
+
+            let audio_input =
+                async_openai::types::AudioInput::from_vec_u8("input.wav".to_string(), audio);
+            let request = async_openai::types::CreateTranscriptionRequestArgs::default()
+                .file(audio_input)
+                .model(model.name)
+                .build()?;
+
+            let response = client.audio().transcribe(request).await?;
+            Ok(serde_json::json!({ "status": "success", "data": response.text }))
         }
         "file.convert" => {
             #[derive(serde::Deserialize)]

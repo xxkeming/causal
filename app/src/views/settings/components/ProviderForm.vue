@@ -281,7 +281,8 @@ const modelTagOptions = [
   { label: '推理', value: '推理' },
   { label: '工具', value: '工具' },
   { label: '向量', value: '向量' },
-  { label: '图片', value: '图片' }
+  { label: '图片', value: '图片' },
+  { label: '语音识别', value: '语音识别' }
 ];
 
 // 提交表单

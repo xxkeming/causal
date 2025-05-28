@@ -310,6 +310,12 @@ export interface Search {
   resultCount: u32
 }
 
+/// 设置
+export interface Settings {
+  search: Search;
+  transcriptions?: ProviderModel;
+}
+
 // API 响应格式
 export interface ApiResponse<T = any> {
   code: number;

@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-mime_guess2 = "2.3.0"
+base64 = { workspace = true }
 
-base64 = "0.22.1"
+mime_guess2 = "2.3.0"
 markitdown = "0.1.9"

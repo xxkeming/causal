@@ -163,11 +163,10 @@ pub async fn event(
         (message, histroy)
     };
 
-    // chat(tasks, store, agent, provider, message, histroy, search, time, stream, sender_event).await
     let message_id = message.id;
     let mut message = openai::Message::new_user(message)?;
 
-    let mut search = if search { Some(app.store.get_search()?) } else { None };
+    let mut search = if search { Some(app.store.get_settings()?.search) } else { None };
 
     // 先联网搜索
     if let Some(search) = search.take_if(|v| v.mode == 1) {

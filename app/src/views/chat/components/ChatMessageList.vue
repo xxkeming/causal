@@ -198,7 +198,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { 
-  NAvatar, NIcon, NButton 
+  NAvatar, NIcon, NButton, NSpin,
 } from 'naive-ui';
 import { 
   ServerOutline, PersonOutline, AlertCircleOutline,

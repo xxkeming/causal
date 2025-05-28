@@ -79,8 +79,7 @@ import {
   MoonOutline,
   ChatbubbleOutline,
   InformationCircleOutline,
-  SettingsOutline,
-  SearchOutline
+  SettingsOutline
 } from '@vicons/ionicons5'
 import { useRouter, useRoute } from 'vue-router'
 import { useThemeStore } from '../stores/themeStore'
@@ -101,14 +100,14 @@ const settingsOptions = [
     label: '模型配置',
     key: 'settings/model',
     icon: () => h('div', { class: 'dropdown-menu-icon' }, [
-      h(NIcon, { size: 18, style: 'display:flex; align-items:center;' }, { default: () => h(SettingsOutline) })
+      h(NIcon, { size: 18, style: 'display:flex; align-items:center;' }, { default: () => h(ConstructOutline) })
     ])
   },
   {
-    label: '搜索配置',
-    key: 'settings/search',
+    label: '系统配置',
+    key: 'settings/settings',
     icon: () => h('div', { class: 'dropdown-menu-icon' }, [
-      h(NIcon, { size: 18, style: 'display:flex; align-items:center;' }, { default: () => h(SearchOutline) })
+      h(NIcon, { size: 18, style: 'display:flex; align-items:center;' }, { default: () => h(SettingsOutline) })
     ])
   },
   {

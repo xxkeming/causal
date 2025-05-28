@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::models::ProviderModel;
+
 // 搜索服务商
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "name")]
@@ -24,4 +26,12 @@ pub struct Search {
     /// 保留几条搜索结果
     #[serde(rename = "resultCount")]
     pub result_count: u32,
+}
+
+// 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
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Settings {
+    pub search: Search,
+    pub transcriptions: Option<ProviderModel>,
 }
