@@ -362,10 +362,13 @@ const hasEnvVars = computed(() => {
 
 // 分类选项
 const categoryOptions = computed(() => {
-  return props.categories.map((category: ToolCategory) => ({
+  return  [
+    { label: '所有工具', value: 0 },
+    ...props.categories.map((category: ToolCategory) => ({
     label: category.name,
     value: category.id
-  }));
+    }))
+  ];
 });
 
 // 表单验证规则
@@ -439,7 +442,7 @@ async function saveTool() {
     }
     
     // 检查分类是否已选择
-    if (!toolForm.categoryId) {
+    if (toolForm.categoryId == null || toolForm.categoryId === undefined) {
       message.error('请选择工具分类');
       return;
     }

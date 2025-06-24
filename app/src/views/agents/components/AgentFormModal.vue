@@ -65,10 +65,10 @@
                 :options="categoryOptions"
                 placeholder="选择分类"
                 :style="{ width: '250px' }"
-                :status="submitAttempted && !formModel.categoryId ? 'error' : undefined"
+                :status="submitAttempted && (formModel.categoryId === null || formModel.categoryId === undefined) ? 'error' : undefined"
               />
               <template #feedback>
-                <span v-if="submitAttempted && !formModel.categoryId" class="error-text">
+                <span v-if="submitAttempted && (formModel.categoryId === null || formModel.categoryId === undefined)" class="error-text">
                   请选择分类
                 </span>
               </template>
@@ -645,10 +645,13 @@ const topPMarks = {
 
 // 分类选项
 const categoryOptions = computed(() => {
-  return categoryStore.categories.map(category => ({
-    label: category.name,
-    value: category.id
-  }));
+  return [
+    { label: '所有智能体', value: 0 },
+    ...categoryStore.categories.map(category => ({
+      label: category.name,
+      value: category.id
+    }))
+  ];
 });
 
 // 参数类型选项
@@ -724,7 +727,14 @@ const basicRules = {
   categoryId: {
     required: true,
     message: '请选择分类',
-    trigger: 'change'
+    trigger: 'change',
+    validator: (_rule: any, value: any) => {
+      // 显式验证null/undefined
+      if (value === null || value === undefined) {
+        return new Error('请选择分类');
+      }
+      return true;
+    }
   }
 };
 
@@ -767,7 +777,7 @@ async function handleSubmit() {
     return false;
   }
   
-  if (!formModel.categoryId) {
+  if (formModel.categoryId === null || formModel.categoryId === undefined) {
     activeTab.value = 'basic';
     message.error('表单验证失败，请选择分类');
     return false;
