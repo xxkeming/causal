@@ -8,6 +8,7 @@ import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import katex from 'katex';
 import mermaid from 'mermaid';
+import * as echarts from 'echarts';
 
 import 'katex/dist/katex.min.css';
 
@@ -46,7 +47,12 @@ const md: MarkdownIt = new MarkdownIt({
       // 返回一个特殊标记，稍后会被处理
       return `<div class="mermaid-placeholder" data-diagram="${encodeURIComponent(str)}"></div>`;
     }
-    
+    // 特殊处理 echarts 代码块
+    if (lang === 'echarts') {
+      // 返回一个特殊标记，稍后会被处理
+      return `<div class="echarts-placeholder" data-config="${encodeURIComponent(str)}"></div>`;
+    }
+
     // 处理其他语言的代码块
     let highlightedCode = '';
     if (lang && hljs.getLanguage(lang)) {
@@ -93,7 +99,7 @@ const md: MarkdownIt = new MarkdownIt({
 // 初始化 Mermaid
 onMounted(() => {
   mermaid.initialize({
-    startOnLoad: false,
+    startOnLoad: true,
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'sans-serif'
@@ -169,7 +175,6 @@ async function renderMermaidDiagrams(html: string): Promise<string> {
   if (html.includes('class="mermaid-diagram"')) {
     return html;
   }
-  
   // 保护代码块内的mermaid代码不被渲染
   const codeBlocks: string[] = [];
   html = html.replace(/<pre class="hljs"><code>[\s\S]*?<\/code><\/pre>/g, (match) => {
@@ -177,18 +182,15 @@ async function renderMermaidDiagrams(html: string): Promise<string> {
     codeBlocks.push(match);
     return `<!--CODE_BLOCK_${index}-->`;
   });
-  
   const mermaidPattern = /<div class="mermaid-placeholder" data-diagram="([^"]+)"><\/div>/g;
   const matches = html.matchAll(mermaidPattern);
-  
   for (const match of matches) {
     try {
       const id = `mermaid-diagram-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-      const diagram = decodeURIComponent(match[1]);
-      
+      // 使用 normalizeMermaid 处理结构符号
+      let diagram = decodeURIComponent(match[1]);
       // 使用 Mermaid API 渲染图表
       const { svg } = await mermaid.render(id, diagram);
-      
       // 使用紧凑结构渲染Mermaid图表，减少空白
       html = html.replace(
         match[0],
@@ -196,29 +198,126 @@ async function renderMermaidDiagrams(html: string): Promise<string> {
       );
     } catch (error) {
       console.error('Mermaid 渲染错误:', error);
+      // Mermaid 渲染错误时显示复制按钮但不显示原始内容
       html = html.replace(
         match[0],
-        `<div class="code-block mermaid-error-container">
-          <div class="code-header">
-            <span class="code-language">mermaid (错误)</span>
-          </div>
-          <div class="mermaid-error">
-            <div>流程图渲染错误:</div>
-            <pre>${decodeURIComponent(match[1])}</pre>
-            <pre class="error-message">${error}</pre>
-          </div>
-        </div>`
+        `<div class="code-block mermaid-error-container"><div class="code-header"><span class="code-language">mermaid (渲染错误)</span><button class="code-copy-btn" title="复制原始源码" onclick="navigator.clipboard.writeText(decodeURIComponent('${match[1]}')); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000);"><svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='copy-icon'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path></svg><svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='check-icon'><polyline points='20 6 9 17 4 12'></polyline></svg></button></div><div class="mermaid-error"><pre class="error-message">${error instanceof Error ? error.message : error}\n常见原因：\n- 语法错误或缺少类型声明（如 flowchart、pie、line 等）\n- Mermaid 版本不支持该类型\n- 结构符号未被正确转换为半角\n- 其他渲染异常\n请检查语法或联系开发者。</pre></div></div>`
       );
     }
   }
-  
   // 恢复代码块
   html = html.replace(/<!--CODE_BLOCK_(\d+)-->/g, (_match, index) => {
     return codeBlocks[parseInt(index)];
   });
-  
   return html;
 }
+
+// 处理 ECharts 图表
+async function renderEchartsCharts(html: string): Promise<string> {
+  // 检查是否已经包含已渲染的ECharts内容，如果有则不重复渲染
+  if (html.includes('class="echarts-chart"')) {
+    return html;
+  }
+  // 保护代码块内的echarts代码不被渲染
+  const codeBlocks: string[] = [];
+  html = html.replace(/<pre class="hljs"><code>[\s\S]*?<\/code><\/pre>/g, (match) => {
+    const index = codeBlocks.length;
+    codeBlocks.push(match);
+    return `<!--CODE_BLOCK_${index}-->`;
+  });
+  // 处理所有echarts占位符
+  const echartsPattern = /<div class="echarts-placeholder" data-config="([^"]*)"><\/div>/g;
+  const matches = Array.from(html.matchAll(echartsPattern));
+  for (const match of matches) {
+    let optionStr = '';
+    let optionObj: any = null;
+    try {
+      optionStr = decodeURIComponent(match[1]);
+      optionObj = JSON.parse(optionStr);
+    } catch (error) {
+      // ECharts 渲染错误时显示复制按钮但不显示原始内容
+      html = html.replace(
+        match[0],
+        `<div class="code-block echarts-container"><div class="code-header"><span class="code-language">echarts (渲染错误)</span><button class="code-copy-btn" title="复制原始配置" onclick="navigator.clipboard.writeText(decodeURIComponent('${match[1]}')); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000);"><svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='copy-icon'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path></svg><svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='check-icon'><polyline points='20 6 9 17 4 12'></polyline></svg></button></div><div class="echarts-error"><pre class="error-message">${error instanceof Error ? error.message : error}
+\n提示：ECharts 配置仅支持标准 JSON，不支持函数、表达式或注释。\n请勿在配置中包含 function、箭头函数、注释等 JS 语法。\n如仍有问题请检查 JSON 格式或联系开发者。</pre></div></div>`
+      );
+      continue;
+    }
+    // 生成唯一id
+    const id = `echarts-chart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    // 生成容器结构
+    html = html.replace(
+      match[0],
+      `<div class="code-block echarts-container"><div class="code-header"><span class="code-language">echarts</span><button class="code-copy-btn" title="复制图表配置" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(optionStr)}')); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000);"><svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='copy-icon'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path></svg><svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='check-icon'><polyline points='20 6 9 17 4 12'></polyline></svg></button></div><div class="echarts-chart" id="${id}" style="width:100%;min-height:320px;"></div></div>`
+    );
+    // 延迟渲染，等DOM更新后再挂载
+    setTimeout(() => {
+      const dom = document.getElementById(id);
+      if (dom && optionObj) {
+        try {
+          const chart = echarts.init(dom);
+          chart.setOption(optionObj);
+        } catch (e) {
+          dom.innerHTML = `<div class='echarts-error'>ECharts 渲染错误:<pre>${e}</pre></div>`;
+        }
+      }
+    }, 0);
+  }
+  // 恢复代码块
+  html = html.replace(/<!--CODE_BLOCK_(\d+)-->/g, (_match, index) => {
+    return codeBlocks[parseInt(index)];
+  });
+  return html;
+}
+
+// 更强健的 normalizeMermaid：严格替换所有结构符号为半角，并清理结构符号两侧多余空格
+// function normalizeMermaid(input: string): string {
+//   let output = input
+//     // 全角冒号、逗号、句号、分号、括号、百分号、箭头、等号、空格
+//     .replace(/[：﹕]/g, ':')
+//     .replace(/[，﹐]/g, ',')
+//     .replace(/[。﹒．]/g, '.')
+//     .replace(/[；﹔]/g, ';')
+//     .replace(/[（﹙【〔｛［]/g, '(')
+//     .replace(/[）﹚】〕｝］]/g, ')')
+//     .replace(/[《〈﹤＜]/g, '<')
+//     .replace(/[》〉﹥＞]/g, '>')
+//     .replace(/[％]/g, '%')
+//     .replace(/[‘’＇]/g, "'")
+//     .replace(/[“”〃＂]/g, '"')
+//     .replace(/[－—–﹣]/g, '-')
+//     .replace(/[＝﹦]/g, '=')
+//     .replace(/[　]/g, ' ')
+//     // 中文箭头
+//     .replace(/-＞/g, '->')
+//     .replace(/=＞/g, '=>')
+//     .replace(/＜-/g, '<-')
+//     .replace(/＜=/g, '<=')
+//     .replace(/[→➔➜➝➞➟➡➠➢➣➤➥➦➧➨➩➪➫➬➭➮➯➱➲➳➴➵➶➷➸➹➺➻➼➽➾➚➙➛➜➝➞➟]/g, '->')
+//     // 省略号
+//     .replace(/[………]/g, '...');
+
+//   // 统一所有箭头符号为半角
+//   output = output.replace(/\s*--?>\s*/g, ' --> ')
+//                  .replace(/\s*==>\s*/g, ' ==> ')
+//                  .replace(/\s*<--\s*/g, ' <-- ')
+//                  .replace(/\s*<==\s*/g, ' <== ')
+//                  .replace(/\s*-\.-\s*/g, ' -.-> ')
+//                  .replace(/\s*==\s*/g, ' == ')
+//                  .replace(/\s*:=\s*/g, ' := ');
+
+//   // 清理结构符号两侧多余空格（如冒号、百分号、逗号、分号、等号）
+//   output = output.replace(/\s*:\s*/g, ':')
+//                  .replace(/\s*%\s*/g, '%')
+//                  .replace(/\s*,\s*/g, ',')
+//                  .replace(/\s*;\s*/g, ';')
+//                  .replace(/\s*=\s*/g, '=');
+
+//   // 清理多余的全角/零宽空格
+//   output = output.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+
+//   return output;
+// }
 
 // 处理 <think> 标签，将其转换为可折叠区域
 function processThinkTags(html: string): { html: string; thinkBlocks: string[] } {
@@ -318,6 +417,9 @@ async function renderMarkdown(content: string): Promise<string> {
     
     // 处理 Mermaid 图表
     html = await renderMermaidDiagrams(html);
+    
+    // 处理 ECharts 图表
+    html = await renderEchartsCharts(html);
     
     // 恢复并处理思考过程标签
     html = restoreThinkBlocks(html, thinkBlocks);
@@ -658,18 +760,10 @@ onMounted(() => {
 }
 
 .markdown-body :deep(.mermaid-error-container) {
-  margin: 10px 0;
-}
-
-.markdown-body :deep(.mermaid-error) {
-  padding: 8px 10px;
-  color: #d03050;
-  font-size: 14px;
+  margin: 0px 0;
 }
 
 .markdown-body :deep(.mermaid-error pre) {
-  margin: 5px 0;
-  padding: 5px;
   background-color: rgba(255, 255, 255, 0.7);
   border-radius: 3px;
   overflow-x: auto;
@@ -677,10 +771,14 @@ onMounted(() => {
   line-height: 1.3;
 }
 
-.markdown-body :deep(.mermaid-error .error-message) {
+.markdown-body :deep(.mermaid-error .error-message),
+.markdown-body :deep(.echarts-error .error-message) {
   color: #e53935;
   border-left: 3px solid #e53935;
   padding-left: 5px;
+  font-size: 13px;
+  background: none;
+  margin: 0;
 }
 
 /* 优化KaTeX公式样式 */
@@ -1070,5 +1168,26 @@ onMounted(() => {
 .markdown-body :deep(.external-link:hover) {
   text-decoration: underline;
   opacity: 0.8;
+}
+
+.echarts-container {
+  margin: 8px 0;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+  background: #f6f8fa;
+  overflow: hidden;
+}
+.echarts-chart {
+  width: 100%;
+  min-height: 320px;
+  background: #fff;
+}
+.echarts-error {
+  color: #d03050;
+  padding: 8px;
+  font-size: 14px;
+  background: rgba(208,48,80,0.07);
+  border-radius: 3px;
+  margin: 8px 0;
 }
 </style>

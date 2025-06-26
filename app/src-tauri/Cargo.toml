@@ -18,7 +18,7 @@ tauri-build = { version = "2", features = [] }
 chrono = { workspace = true }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon", "image", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-window-state = "2"
 

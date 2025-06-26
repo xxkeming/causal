@@ -1,7 +1,7 @@
 {
   "name": "causal",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,10 +20,11 @@
     "@tauri-apps/plugin-updater": "^2.7.1",
     "@types/katex": "^0.16.7",
     "@vicons/ionicons5": "^0.13.0",
+    "echarts": "^5.6.0",
     "highlight": "^0.2.4",
     "katex": "^0.16.21",
     "markdown-it": "^14.1.0",
-    "mermaid": "^11.5.0",
+    "mermaid": "^11.7.0",
     "naive-ui": "^2.41.0",
     "pinia": "^3.0.1",
     "vue": "^3.5.13",

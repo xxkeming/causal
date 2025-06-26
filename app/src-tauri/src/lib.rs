@@ -6,9 +6,13 @@ use std::{collections::HashMap, sync::Arc};
 
 use openai::tool::ToolObject;
 use store::Search;
+
 use tauri::Manager;
 // use tauri_plugin_updater::UpdaterExt;
+use tauri::image;
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
 use tokio::sync::RwLock;
 
 struct AppState {
@@ -181,13 +185,31 @@ pub async fn run() {
     };
 
     tauri::Builder::default()
-        // .setup(|app| {
-        //     let handle = app.handle().clone();
-        //     tauri::async_runtime::spawn(async move {
-        //         update(handle).await.unwrap();
-        //     });
-        //     Ok(())
-        // })
+        .setup(|app| {
+            // let handle = app.handle().clone();
+            // tauri::async_runtime::spawn(async move {
+            //     update(handle).await.unwrap();
+            // });
+            TrayIconBuilder::new()
+                .icon(image::Image::from_bytes(include_bytes!("../icons/icon.png"))?)
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click { .. } => {
+                        // tracing::info!("tray icon double clicked");
+
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {
+                        // log::warn!("unhandled event {event:?}");
+                    }
+                })
+                .build(app)?;
+            Ok(())
+        })
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
