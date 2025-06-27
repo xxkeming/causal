@@ -1090,7 +1090,6 @@ if (categoryStore.categories.length === 0) {
   height: 250px !important;
   box-shadow: none !important;
   border-radius: 6px !important;
-  padding-bottom: 32px !important;
 }
 
 /* 更强大的选择器，确保覆盖所有可能的框架样式 */
