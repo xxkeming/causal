@@ -213,10 +213,19 @@ impl Store {
 
     /// 删除会话的所有消息
     pub fn delete_messages_by_session(&self, session_id: u64) -> Result<(), StoreError> {
-        let messages = self.get_messages_by_session(session_id)?;
-        for message in messages {
-            self.delete_chat_message(message.id)?;
+        let all_messages = ChatMessage::all(&self.db);
+        let query_result = all_messages
+            .query()
+            .map_err(|e| StoreError::Operator(format!("query chat messages {e}")))?;
+
+        // 过滤出属于指定会话的消息并批量删除
+        for doc in query_result.iter() {
+            if doc.contents.session_id == session_id {
+                doc.delete(&self.db)
+                    .map_err(|e| StoreError::Operator(format!("delete chat message {e}")))?;
+            }
         }
+
         Ok(())
     }
 
